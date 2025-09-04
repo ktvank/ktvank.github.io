@@ -1,9 +1,9 @@
+---
 - title: General Information
   type: map
   contents:
     - name: Full Name
       value: Katherine Van Koevering
-
 - title: Education
   type: time_table
   contents:
@@ -15,14 +15,13 @@
           contents: Jon Kleinberg
         - title: Thesis
           contents:
-            - Social Tectonics The Shifting Dynamics of Digital Discourse
+            - Social Tectonics':' The Shifting Dynamics of Digital Discourse
     - title: Undergraduate
       institution: University of Washington
       year: 2018
       description:
         - Computer Science
         - Statistics
-
 - title: Research and Teaching Experience
   type: time_table
   contents:
@@ -31,54 +30,50 @@
       year: 2023
       description:
         - CS 4820, Advanced Algorithms
-        - Co-taught senior level algorithms course (450 students) with Eshan Chattopadhyay. Responsibilities
-included lectures, homeworks, managing course logistics, exams, office hours, etc
-
+        - Co-taught senior level algorithms course (450 students) with Eshan
+          Chattopadhyay. Responsibilities included lectures, homeworks, managing
+          course logistics, exams, office hours, etc
     - title: Research Intern
       institution: Microsoft Research
       year: 2021
       description:
         - Dr. Jennifer Neville
-
     - title: Research Intern
       institution: Microsoft Research
       year: 2020
       description:
         - Dr. Julia Kiseleva
-
     - title: Undergraduate Research Assistant
       institution: University of Washington
       year: 2017
       description:
         - Dr. Kate Starbird
-
     - title: Undergraduate Research Assistant
       institution: University of Washington
       year: 2016
       description:
         - Dr. Richard Anderson.
-
 - title: Other Experience
   type: time_table
   contents:
     - title: Software Engineering Intern
       institution: Facebook
       year: 2017
-
     - title: Software Engineering Intern
       institution: Zillow
       year: 2016
-
-
 - title: Academic Interests
   type: nested_list
   contents:
     - title: Digital Communication
       items:
         - Analyzing the movement of people and ideas across the internet
-        - Analyzing changing communication styles across time, audience, and platform
-        - Analyzing human/AI communication and making recommendations for both humans and AI
+        - Analyzing changing communication styles across time, audience, and
+          platform
+        - Analyzing human/AI communication and making recommendations for both
+          humans and AI
     - title: Network Science
       items:
         - Using complex network structures to model and analyze complicated data
         - Developing stastical, graphical tools to facilitate this analysis
+
