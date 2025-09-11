@@ -9,4 +9,4 @@ nav_order: 6
 
 Co-taught CS 4820, Advanced Algorithms, with Eshan Chattopadhyay in 2023.
 
-Link to [Syllabus][https://www.cs.cornell.edu/courses/cs4820/2023sp/syllabus/]
+Link to [Syllabus](https://www.cs.cornell.edu/courses/cs4820/2023sp/syllabus/)
