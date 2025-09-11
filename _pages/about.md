@@ -26,4 +26,4 @@ latest_posts:
   limit: 3 # leave blank to include all the blog posts
 ---
 
-I am a post doctoral researcher at Johns Hopkins, working with DSAI and [Anjalie Field][https://engineering.jhu.edu/faculty/anjalie-field/]. I study digital communication including social media, human/AI communication, and more from the perspectives of computational linguistics, network science, and data analysis. I received my PhD in 2025 from Cornell under Jon Kleinberg.
+I am a post doctoral researcher at Johns Hopkins, working with DSAI and [Anjalie Field](https://engineering.jhu.edu/faculty/anjalie-field/). I study digital communication including social media, human/AI communication, and more from the perspectives of computational linguistics, network science, and data analysis. I received my PhD in 2025 from Cornell under Jon Kleinberg.
