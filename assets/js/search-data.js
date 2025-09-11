@@ -32,7 +32,7 @@ ninja.data = [{
           },
         },{id: "nav-teaching",
           title: "teaching",
-          description: "Co-taught CS 4820 at Cornell",
+          description: "Teaching experiences",
           section: "Navigation",
           handler: () => {
             window.location.href = "/teaching/";
