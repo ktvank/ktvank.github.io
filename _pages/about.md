@@ -10,10 +10,10 @@ profile:
   image_circular: false # crops the image to make it circular
   more_info: >
     <p>Hackerman 225</p>
-    <p>Baltimore, MD, USA5</p>
+    <p>Baltimore, MD, USA</p>
 
 selected_papers: false # includes a list of papers marked as "selected={true}"
-social: false # includes social icons at the bottom of the page
+social: true # includes social icons at the bottom of the page
 
 announcements:
   enabled: false # includes a list of news items
