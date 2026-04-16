@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Historical Binomial Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+  <link rel="stylesheet" href="visualizer.css">
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <header class="site-header">
+      <h1>Historical Binomial Visualizer</h1>
+      <p>This tool tracks how often word pairs appear in alphabetical versus reverse-alphabetical order across historical American English text — a measure called <em>ordinality</em>. Shifts in ordinality over time can reflect changes in language, culture, or social context.</p>
+      <p>Enter one or more word pairs below to explore their history. Pairs are automatically sorted alphabetically, so <em>left right</em> and <em>right left</em> are treated the same.</p>
+      <p>Read the <a href="paper.org">full description</a> of the dataset and analysis.</p>
+      <p class="download-links">Download: <a href="consolidated_ords.csv" download>full dataset</a> &nbsp;&middot;&nbsp; <a href="uncleaned_data_consolidated_limited.csv" download>filtered dataset</a></p>
+    </header>
+
+    <!-- Input -->
+    <section class="input-section">
+      <label for="binomials" class="input-label">Enter word pairs (e.g. <em>left right, day night, cats dogs</em>)</label>
+      <div class="input-group">
+        <input type="text" id="binomials" class="form-control" placeholder="left right, day night, cats dogs" required>
+        <div class="input-group-append">
+          <button type="submit" id="run_graph" class="btn btn-primary">Submit</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chart -->
+    <section class="chart-card">
+      <div id="container" class="svg-container">
+        <div id="my_dataviz"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Tooltip -->
+  <div id="tooltip">
+    <div class="tooltip-bin"><span id="bin"></span></div>
+    <div class="tooltip-row">Date: <span id="date"></span></div>
+    <div class="tooltip-row">Ordinality: <span id="ordinality"></span></div>
+    <div class="tooltip-row">Count: <span id="count"></span></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://d3js.org/d3.v5.js"></script>
+  <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js" integrity="sha512-wNH6xsp2n8CfB91nrBtfc4sfLwYPBMjSWVUwQOp60AYYXH6i8yCwuKFZ4rgK2i6pQek/b+bSyR7b01/922IBzQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWe8ZBKAJGNjFE6rHnfbe5L7DKc3/w6/ZGvG4p+omEXLDiPida6sNMd2f" crossorigin="anonymous"></script>
+
+  <script>
+
+  // set the dimensions and margins of the graph
+  var margin = {top: 10, right: 200, bottom: 30, left: 60},
+      width = 1200 - margin.left - margin.right,
+      height = 800 - margin.top - margin.bottom;
+
+  // append the svg object to the body of the page
+  var svg = d3.select("#my_dataviz")
+    .append("svg")
+      .attr("preserveAspectRatio", "xMinYMin meet")
+      .attr("viewBox", "0 0 1200 1000")
+      .classed("svg-content", true)
+    .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+  const BINOM_INIT = ["(down, up)", "(left, right)", "(backward, forward)"];
+
+  function binToFilename(bin) {
+    return bin.replace(/[()]/g, "").replace(", ", "_");
+  }
+
+  function parseBinomials(text) {
+    text = text.toLowerCase().replace(/[^0-9a-z ,]/gi, "");
+    const binoms = [];
+    for (const b of text.split(/, |,/g)) {
+      let arr = b.trim().split(" ");
+      arr.sort((a, b) => a.localeCompare(b));
+      if (arr.length !== 2) {
+        alert("Binomials must have exactly two words separated by a space. Please double check your entry formatting.");
+        throw new Error("Binomials must have exactly two words.");
+      }
+      binoms.push("(" + arr[0] + ", " + arr[1] + ")");
+    }
+    return binoms;
+  }
+
+  function fetchBinomials(binoms) {
+    const dateParser = d3.timeParse("%Y");
+    return Promise.all(
+      binoms.map(bin =>
+        d3.csv("data/" + binToFilename(bin) + ".csv")
+          .then(records => records.map(r => ({
+            bin: bin,
+            date: dateParser(r.date),
+            ordinality: +r.ordinality,
+            count: +r.count,
+          })))
+          .catch(() => [])
+      )
+    ).then(results => results.flat());
+  }
+
+  document.getElementById("run_graph").addEventListener("click", function() {
+    const binoms = parseBinomials(document.getElementById("binomials").value);
+    fetchBinomials(binoms).then(function(data) {
+      d3.selectAll("g > *").remove();
+      draw_graph(data, binoms);
+    });
+  });
+
+  document.getElementById("binomials").addEventListener("keyup", function(event) {
+    event.preventDefault();
+    if (event.keyCode === 13) {
+      document.getElementById("run_graph").click();
+    }
+  });
+
+  fetchBinomials(BINOM_INIT).then(function(data) {
+    draw_graph(data, BINOM_INIT);
+  });
+
+
+  function draw_graph(data, lst){
+    var sorted_data = data.slice().sort(function(a,b) {return +a.date - +b.date})
+    var df = lst.map(function(grpName) {
+      return {
+        bin: grpName,
+        values: sorted_data.filter(function(d){return grpName==d.bin})
+      };
+    });
+
+    var myColor = d3.scaleOrdinal()
+        .domain(lst)
+        .range(d3.schemeSet2);
+
+    // Add X axis
+    var x = d3.scaleTime()
+      .domain(d3.extent(sorted_data, function(dat) { return dat.date}))
+      .range([ 0, width ])
+      .nice();
+    svg.append("g")
+      .attr("transform", "translate(0," + height + ")")
+      .attr("class", "axis")
+      .call(d3.axisBottom(x));
+
+    // Add Y axis
+    var y = d3.scaleLinear()
+      .domain(d3.extent(sorted_data, function(dat) {return dat.ordinality}))
+      .range([ height, 0 ])
+      .nice();
+    svg.append("g")
+      .attr("class", "axis")
+      .call(d3.axisLeft(y));
+
+    // Reference line at ordinality = 0.5
+    svg.append("line")
+      .attr("x1", 0)
+      .attr("x2", width)
+      .attr("y1", y(0.5))
+      .attr("y2", y(0.5))
+      .attr("class", "reference-line");
+
+    svg.append("text")
+      .attr("class", "axis-label")
+      .attr("text-anchor", "end")
+      .attr("x", width)
+      .attr("y", height - 6)
+      .text("Year");
+
+    svg.append("text")
+      .attr("class", "axis-label")
+      .attr("text-anchor", "end")
+      .attr("y", 6)
+      .attr("dy", ".75em")
+      .attr("transform", "rotate(-90)")
+      .text("Ordinality");
+
+    // Add the points
+    svg
+      .selectAll("myDots")
+      .data(df)
+      .enter()
+        .append('g')
+        .style("fill", function(dat){ return myColor(dat.bin) })
+      .selectAll("myPoints")
+      .data(function(dat){ return dat.values })
+      .enter()
+      .append("circle")
+        .attr("cx", function(dat) { return x(dat.date) } )
+        .attr("cy", function(dat) { return y(dat.ordinality) } )
+        .attr("r", 3)
+        .attr("stroke", "white");
+
+    svg.append("g")
+      .attr("class", "legendOrdinal")
+      .attr("transform", "translate(" + String(width + margin.left) + ",20)");
+
+    var legendOrdinal = d3.legendColor()
+      .shapePadding(10)
+      .scale(myColor);
+
+    svg.select(".legendOrdinal")
+      .call(legendOrdinal);
+
+
+    // VORONOI
+    const tooltip = d3.select("#tooltip");
+
+    var onMouseEnter = function(d, _i) {
+      svg.append("circle")
+        .attr("class", "tooltipDot")
+        .attr("cx", x(d.date))
+        .attr("cy", y(d.ordinality))
+        .attr("r", 7)
+        .style("fill", "#c0392b")
+        .style("pointer-events", "none");
+
+      const dateParser = d3.timeParse("%Y");
+      const formatDate = d3.timeFormat("%Y");
+      const formatOrdinality = d3.format(".2f");
+
+      tooltip.select("#bin").text(d.bin);
+      tooltip.select("#date").text(formatDate(dateParser(d.date)));
+      tooltip.select("#count").text(d.count);
+      tooltip.select("#ordinality").text(formatOrdinality(d.ordinality));
+
+      tooltip.style("left", (d3.event.pageX + 14) + "px");
+      tooltip.style("top", (d3.event.pageY - 36) + "px");
+      tooltip.style("opacity", 1);
+    }
+
+    var onMouseLeave = function(_i, d) {
+      tooltip.style("opacity", 0);
+      d3.selectAll(".tooltipDot").remove();
+    }
+
+    const delaunay = d3.Delaunay.from(
+      sorted_data,
+      d => x(d.date),
+      d => y(d.ordinality),
+    )
+
+    const voronoi = delaunay.voronoi();
+    voronoi.xmax = width;
+    voronoi.ymax = height;
+
+    svg.selectAll(".voronoi")
+      .attr('class', 'overlay')
+      .data(sorted_data)
+      .enter().append("path")
+      .attr("class", "voronoi")
+      .attr("d", (d,i) => voronoi.renderCell(i))
+        .style("fill", "none")
+        .style("pointer-events", "all")
+        .on("mouseenter", onMouseEnter)
+        .on("mouseleave", onMouseLeave);
+  }
+
+  </script>
+</body>
+</html>
