@@ -10,4 +10,6 @@ Gemfile.lock
 assets/libs/
 node_modules/
 vendor
-.idea
+.ideabinom_explorer/consolidated_ords.csv
+binom_explorer/uncleaned_data_consolidated_limited.csv
+binom_explorer/*.swp
