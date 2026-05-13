@@ -7,7 +7,7 @@ nav: true
 nav_order: 3
 ---
 
-My research sits at the intersection of computational linguistics, network science, and large-scale data analysis. I study how language shapes — and is shaped by — AI systems, and how people communicate online.
+Human language is messy, socially marked, and full of patterns we don't consciously intend. When you train a model on it, what comes out the other side? I study the collision between human linguistic variation and AI systems — how language shapes AI outputs, how AI shapes human communication, and how the two are increasingly shaping each other.
 
 ---
 
