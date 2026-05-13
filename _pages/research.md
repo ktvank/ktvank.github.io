@@ -25,4 +25,4 @@ LLMs are trained on human-generated text, and they absorb more from that trainin
 
 ### Humans Online
 
-My PhD work at Cornell (advised by [Jon Kleinberg](https://www.cs.cornell.edu/home/kleinber/)) examined how people use language and form communities online. I studied the conventions governing word ordering in binomial expressions (*bread and butter*, not *butter and bread*) at web scale, developed null models for network analysis, and examined how geographic and topical structure organizes online communities. See the [publications](/publications/) page for details.
+My PhD work at Cornell (advised by [Jon Kleinberg](https://www.cs.cornell.edu/home/kleinber/)) examined how people use language and form communities online. I studied the conventions governing word ordering in [binomial expressions](/binom_explorer/visualizer_page.html) (*bread and butter*, not *butter and bread*) at web scale, developed null models for network analysis, and examined how geographic and topical structure organizes online communities. See the [publications](/publications/) page for details.
