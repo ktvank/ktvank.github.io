@@ -28,6 +28,16 @@
               {% endif %}
             </div>
           {% endif %}
+          {% if project.download %}
+            <div class="mt-2">
+              <a href="{{ project.download }}" onclick="event.stopPropagation()" class="btn btn-sm btn-outline-primary">Download</a>
+            </div>
+          {% endif %}
+          {% if project.signup %}
+            <div class="mt-2">
+              <a href="{{ project.signup }}" onclick="event.stopPropagation()" class="btn btn-sm btn-outline-primary">Make an account</a>
+            </div>
+          {% endif %}
         </div>
       </div>
     </div>

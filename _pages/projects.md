@@ -5,7 +5,7 @@ permalink: /projects/
 description: Research tools and interactive visualizations.
 nav: false
 nav_order: 3
-display_categories: [work, fun]
+display_categories: [work, side projects]
 horizontal: false
 ---
 
