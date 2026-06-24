@@ -56,6 +56,16 @@ ninja.data = [{
           description: "An interactive tool for exploring how the ordering of English word pairs has shifted over time. Built with D3.js on a corpus of historical American English text. Companion paper under review.",
           section: "Projects",handler: () => {
               window.location.href = "/projects/10_project.html";
+            },},{id: "projects-crosspaths",
+          title: 'CrossPaths',
+          description: "A travel-overlap app — enter your travel plans and get notified when a connected friend will be in the same place at the same time. Built with FastAPI, SQLAlchemy, and Jinja2.",
+          section: "Projects",handler: () => {
+              window.location.href = "/projects/crosspaths.html";
+            },},{id: "projects-reps-amp-amp-relics",
+          title: 'Reps &amp;amp;amp; Relics',
+          description: "A narrative fitness tracker that turns your workouts into an RPG adventure. Single-file PWA — no backend, no build step, data stored locally.",
+          section: "Projects",handler: () => {
+              window.location.href = "/projects/reps_relics.html";
             },},{
         id: 'social-bluesky',
         title: 'Bluesky',
