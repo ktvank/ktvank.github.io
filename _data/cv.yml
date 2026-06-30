@@ -4,76 +4,205 @@
   contents:
     - name: Full Name
       value: Katherine Van Koevering
+    - name: Email
+      value: kvankoe1@jh.edu
+    - name: Website
+      value: https://ktvank.github.io/
+
 - title: Education
   type: time_table
   contents:
-    - title: PhD
-      institution: Cornell University
-      year: 2025
+    - title: Postdoctoral Fellow
+      institution: Johns Hopkins University, Data Science and AI Institute
+      year: 2025 – present
       description:
-        - title: Advisor
+        - title: Supervisor
+          contents: Anjalie Field
+    - title: PhD, Computer Science
+      institution: Cornell University, Ithaca
+      year: 2018–2025
+      description:
+        - title: Supervisor
           contents: Jon Kleinberg
         - title: Thesis
           contents:
-            - Social Tectonics':' The Shifting Dynamics of Digital Discourse
-    - title: Undergraduate
-      institution: University of Washington
-      year: 2018
+            - "Social Tectonics: The Shifting Dynamics of Digital Discourse"
+    - title: BSc, Computer Science
+      institution: University of Washington, Seattle
+      year: 2014–2018
       description:
-        - Computer Science
-        - Statistics
-- title: Research and Teaching Experience
+        - Data Science Concentration, Magna Cum Laude
+    - title: BSc, Statistics
+      institution: University of Washington, Seattle
+      year: 2014–2018
+      description:
+        - Magna Cum Laude
+
+- title: Publications
   type: time_table
   contents:
+    - title: "Freezing and thawing of linguistic binomials"
+      institution: "Van Koevering, K., Young, A.*, Ye, M.*, and Kleinberg, J."
+      year: 2026
+      description:
+        - "Nature, Submission Pending"
+    - title: "The bureaucratization of the internet: Analyzing the diffusion of governance regimes on Reddit (2011–2023)"
+      institution: "Van Koevering, K. and Liu, Y."
+      year: 2026
+      description:
+        - "ICWSM, Under Review"
+    - title: "Heads, tails, and AI fails: LLMs, randomness, and human judgments"
+      institution: "Van Koevering, K. and Kleinberg, J."
+      year: 2026
+      description:
+        - "EMNLP, Under Review"
+    - title: "Social tectonics: Rapid organization of online communities"
+      institution: "Van Koevering, K., Hong, Y.*, and Kleinberg, J."
+      year: 2026
+      description:
+        - "PlosOne, Under Review"
+    - title: "It's how you ask: Gendered linguistic bias in LLMs"
+      institution: "Van Koevering, K. and Field, A."
+      year: 2026
+      description:
+        - "COLM, Under Review"
+    - title: "How to interpret agent behavior"
+      institution: "Gao, J., Sun, K., Huang, J., Van Koevering, K., et al."
+      year: 2026
+      description:
+        - "NeurIPS, Under Review"
+    - title: "What's in a niche? Migration patterns in online communities"
+      institution: "Van Koevering, K., Ye, M.*, and Kleinberg, J."
+      year: 2024
+      description:
+        - "Submission Pending"
+    - title: "Social tectonics: Rapid organization of online communities"
+      institution: "Van Koevering, K., Hong, Y.*, and Kleinberg, J."
+      year: 2024
+      description:
+        - "Poster presented at IC2S2, Philadelphia, USA"
+    - title: "An abundance of Katherines: The game theory of baby naming"
+      institution: "Blumer, K., Donahue, K., Fritz, K., Ivanovich, K., Lee, K., Luo, K., Meng, C., and Van Koevering, K."
+      year: 2024
+      description:
+        - "SIGBOVIK – CMU Joke Conference"
+    - title: "Random graphs with prescribed k-core sequences: A new null model for network analysis"
+      institution: "Van Koevering, K., Benson, A., and Kleinberg, J."
+      year: 2021
+      description:
+        - "Proceedings of the Web Conference 2021, pages 367–378"
+    - title: "Frozen binomials on the web: Word ordering and language conventions in online text"
+      institution: "Van Koevering, K., Benson, A. R., and Kleinberg, J."
+      year: 2020
+      description:
+        - "Proceedings of The Web Conference 2020, pages 606–616"
+    - title: "Ecosystem or echo-system? Exploring content sharing across alternative media domains"
+      institution: "Starbird, K., Arif, A., Wilson, T., Van Koevering, K., Yefimova, K., and Scarnecchia, D."
+      year: 2018
+      description:
+        - "Proceedings of the International AAAI Conference on Web and Social Media, volume 12"
+
+- title: Academic Experience
+  type: time_table
+  contents:
+    - title: Postdoctoral Fellow
+      institution: Johns Hopkins University, Data Science and AI Institute
+      year: 2025 – present
+      description:
+        - Supervised by Anjalie Field
     - title: Instructor
       institution: Cornell University
-      year: 2023
+      year: Spring 2023
       description:
-        - CS 4820, Advanced Algorithms
-        - Co-taught senior level algorithms course (450 students) with Eshan
-          Chattopadhyay. Responsibilities included lectures, homeworks, managing
-          course logistics, exams, office hours, etc
+        - "CS 4820, Advanced Algorithms"
+        - Co-taught senior level algorithms course (450 students) with Eshan Chattopadhyay. Responsibilities included lectures, homeworks, managing course logistics, exams, office hours, etc.
     - title: Research Intern
       institution: Microsoft Research
-      year: 2021
+      year: Summer 2021
       description:
         - Dr. Jennifer Neville
     - title: Research Intern
       institution: Microsoft Research
-      year: 2020
+      year: Summer 2020
       description:
         - Dr. Julia Kiseleva
     - title: Undergraduate Research Assistant
       institution: University of Washington
-      year: 2017
+      year: 2017–2018
       description:
-        - Dr. Kate Starbird
+        - Prof. Kate Starbird
     - title: Undergraduate Research Assistant
       institution: University of Washington
-      year: 2016
+      year: 2015–2016
       description:
-        - Dr. Richard Anderson.
-- title: Other Experience
+        - Prof. Richard Anderson
+
+- title: Work Experience
   type: time_table
   contents:
     - title: Software Engineering Intern
       institution: Facebook
-      year: 2017
+      year: Summer 2017
     - title: Software Engineering Intern
       institution: Zillow
-      year: 2016
+      year: Summer 2016
+
+- title: Teaching Assistantship
+  type: time_table
+  contents:
+    - title: CS 1340 – Choices and Consequences in Computing
+      institution: Cornell University
+      year: Spring 2022
+    - title: CS 6850 – Graduate Information Networks
+      institution: Cornell University
+      year: Fall 2021
+
+- title: Other Experience
+  type: time_table
+  contents:
+    - title: AI in the News, Organizer
+      institution: Johns Hopkins University
+      year: 2025 – present
+      description:
+        - Founded, manages, and curates weekly discussions for graduate students about AI and its interactions with our world outside of academia, from legal developments to popular culture.
+    - title: JHU Postdoctoral Flash Talk Competition
+      institution: Johns Hopkins University
+      year: 2026
+      description:
+        - 1st Place
+    - title: Room Reservation Czar
+      institution: Cornell University
+      year: 2022–2025
+      description:
+        - Managed meeting room availability for Computer Science School in Gates Hall.
+    - title: Secretary, Board Member
+      institution: Computer Science Graduate Organization, Cornell University
+      year: 2018–2021
+      description:
+        - One of three leaders of the graduate student organization for computer science, leading efforts to manage TA overwork, food waste, and more.
+    - title: Officer, Board Member
+      institution: ACM-W, UW Chapter
+      year: 2017
+
 - title: Academic Interests
   type: nested_list
   contents:
     - title: Digital Communication
       items:
         - Analyzing the movement of people and ideas across the internet
-        - Analyzing changing communication styles across time, audience, and
-          platform
-        - Analyzing human/AI communication and making recommendations for both
-          humans and AI
+        - Analyzing changing communication styles across time, audience, and platform
+        - Analyzing human/AI communication and making recommendations for both humans and AI
     - title: Network Science
       items:
         - Using complex network structures to model and analyze complicated data
-        - Developing stastical, graphical tools to facilitate this analysis
+        - Developing statistical, graphical tools to facilitate this analysis
 
+- title: Computer Skills
+  type: map
+  contents:
+    - name: Programming Languages
+      value: Python, Java, Julia, bash, R
+    - name: Web Technologies
+      value: HTML 5, Javascript
+    - name: Database
+      value: SQL
