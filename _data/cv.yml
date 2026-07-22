@@ -41,6 +41,9 @@
 - title: Academic Experience
   type: time_table
   contents:
+    - title: Organizing Committee
+      institution: NeurIPS 2026 Workshop on Interpreting Agent Behavior, International Convention Centre, Sydney, Australia
+      year: 2026
     - title: Postdoctoral Fellow
       institution: Johns Hopkins University, Data Science and AI Institute
       year: 2025 – present

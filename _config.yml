@@ -7,7 +7,7 @@ first_name: Katherine
 middle_name: >
 last_name: Van Koevering
 contact_note: >
-  Want to connect? Please send me an email! I'm always looking for collaborators and interesting people.
+  I'm always happy to hear from researchers, students, and anyone thinking seriously about language and AI. Feel free to reach out.
 description: >
   Postdoctoral researcher at Johns Hopkins studying how large language models interact with human linguistic variation, AI behavioral patterns, and human/AI communication.
 footer_text: >
@@ -15,7 +15,7 @@ footer_text: >
   Hosted by <a href="https://pages.github.com/" target="_blank">GitHub Pages</a>.
 keywords: AI linguistics, LLM behavior, human-AI communication, language variation, computational linguistics, network science, NLP, postdoc, Johns Hopkins
 lang: en # the language of your site (for example: en, fr, cn, ru, etc.)
-icon: ⚛️ # the emoji used as the favicon (alternatively, provide image name in /assets/img/)
+icon: 💬 # the emoji used as the favicon (alternatively, provide image name in /assets/img/)
 
 url: https://ktvank.github.io # the base hostname & protocol for your site
 baseurl: # the subpath of your site, e.g. /blog/. Leave blank for root
