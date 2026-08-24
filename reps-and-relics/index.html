@@ -1010,6 +1010,8 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
     Resting between sets is not weakness. It is <em>strategy</em>.
   </div>
   <div class="sess-tabs" id="sess-tabs"></div>
+  <div id="plan-gen-panel"></div>
+  <button class="ex-add-btn" id="plan-gen-toggle-btn" onclick="togglePlanGenerator()" style="margin-bottom:12px">✦ Generate a multi-day plan with AI</button>
   <div id="workout-card" class="workout-card"></div>
   <div style="font-size:10px;color:var(--ink4);margin-top:10px;line-height:1.6;text-align:center">⚠ AI-generated — treat as suggestions, not medical advice. Consult a professional if unsure.</div>
 </div><!-- /train -->
@@ -1946,6 +1948,7 @@ function syncReminderState() {
   };
 }
 
+let _storyRepairedNote = null;
 function load() {
   try {
     const d = localStorage.getItem("kat_rpg_v3");
@@ -1983,6 +1986,37 @@ function load() {
     if (S.pauseUntil && today() > S.pauseUntil) S.pauseUntil = null;
     // trim old off days (keep last 90 days)
     S.offDays = S.offDays.filter(d => d >= daysAgo(90));
+    // repair story chapters saved with the pre-fix bug: raw {"title":...,"chapters":[...]}
+    // JSON dumped as literal chapter text instead of being parsed
+    if (S.storyChapters && S.storyChapters.length && S.storyChapters.some(isCorruptedChapterText)) {
+      const joined = S.storyChapters.join('\n\n');
+      let recovered = null, recTitle = null, recPremise = null;
+      try {
+        let parsed;
+        try { parsed = JSON.parse(joined); }
+        catch { parsed = JSON.parse(sanitizeJsonControlChars(joined)); }
+        if (Array.isArray(parsed)) recovered = parsed;
+        else if (parsed && Array.isArray(parsed.chapters)) { recovered = parsed.chapters; recTitle = parsed.title; recPremise = parsed.premise; }
+      } catch (_) { /* fall through to extraction */ }
+      if (!recovered || !recovered.length) {
+        const extracted = extractQuotedStrings(joined);
+        if (extracted.length) recovered = extracted;
+      }
+      if (recovered && recovered.length) {
+        S.storyChapters = recovered;
+        if (recTitle && !S.currentArcTitle)     S.currentArcTitle   = recTitle;
+        if (recPremise && !S.currentArcPremise) S.currentArcPremise = recPremise;
+        _storyRepairedNote = 'recovered';
+      } else {
+        S.storyChapters = [];
+        S.currentArcTitle = '';
+        S.currentArcPremise = '';
+        S.storyChaptersUnlocked = Math.max(1, S.storyChaptersUnlocked || 0);
+        _storyRepairedNote = 'cleared';
+      }
+      S.storyChapterIdx     = Math.min(S.storyChapterIdx || 0, Math.max(0, S.storyChapters.length - 1));
+      S.storyChaptersMaxIdx = Math.min(S.storyChaptersMaxIdx || 0, Math.max(0, S.storyChapters.length - 1));
+    }
   } catch(e) { console.warn("KAT RPG: could not load state", e); }
 }
 
@@ -2524,21 +2558,161 @@ async function saveExercise(si, ei) {
   renderWorkoutCard();
 }
 
-async function generateExerciseName(plainName) {
+const GENRE_EXERCISE_STYLE = {
+  fantasy: 'high fantasy (evocative, medieval/magical, e.g. "The Grounding Stance")',
+  scifi:   'sci-fi (technical, futuristic, e.g. "Gravitational Resistance Protocol")',
+  mystery: 'noir mystery (shadowy, investigative, e.g. "The Crouching Surveillance Position")',
+  cozy:    'cosy (warm, gentle, e.g. "The Morning Garden Stretch")',
+};
+function exerciseNameStyle() {
   const genre = (S.prefs || {}).genre || 'fantasy';
-  const style = {
-    fantasy: 'high fantasy (evocative, medieval/magical, e.g. "The Grounding Stance")',
-    scifi:   'sci-fi (technical, futuristic, e.g. "Gravitational Resistance Protocol")',
-    mystery: 'noir mystery (shadowy, investigative, e.g. "The Crouching Surveillance Position")',
-    cozy:    'cosy (warm, gentle, e.g. "The Morning Garden Stretch")',
-  };
+  return GENRE_EXERCISE_STYLE[genre] || GENRE_EXERCISE_STYLE.fantasy;
+}
+
+async function generateExerciseName(plainName) {
   try {
     const name = await callApi(
-      [{ role:'user', content: `Give the exercise "${plainName}" a single thematic ${style[genre] || style.fantasy} name. Reply with ONLY the name — no quotes, no explanation.` }],
+      [{ role:'user', content: `Give the exercise "${plainName}" a single thematic ${exerciseNameStyle()} name. Reply with ONLY the name — no quotes, no explanation.` }],
       { maxTokens: 30 }
     );
     return name.trim().replace(/^["']|["']$/g, '');
   } catch(_) { return null; }
+}
+
+// Extracts a JSON object/array from a raw AI response (stripping code fences if
+// present) and parses it, falling back to control-character sanitization for
+// responses containing raw newlines inside string values.
+function extractJsonBlock(raw, kind) {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) return fenced[1].trim();
+  const re = kind === 'array' ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
+  const m = raw.match(re);
+  return (m ? m[0] : raw).trim();
+}
+function parseJsonLoose(raw, kind) {
+  const clean = extractJsonBlock(raw, kind);
+  try { return JSON.parse(clean); }
+  catch { return JSON.parse(sanitizeJsonControlChars(clean)); }
+}
+
+function normalizeGeneratedExercises(list) {
+  const exercises = (Array.isArray(list) ? list : []).map(e => ({
+    f:    String(e.f || e.p || 'Exercise'),
+    p:    String(e.p || e.f || 'Exercise'),
+    h:    String(e.h || ''),
+    sets: String(e.sets || '3 × 10'),
+    xp:   typeof e.xp === 'number' ? e.xp : 15,
+  }));
+  return exercises.length ? exercises : [{ f: 'Exercise', p: 'Exercise', h: '', sets: '3 × 10', xp: 15 }];
+}
+
+// Generates label/sub/exercises for ONE session from a free-text description.
+async function generateSessionPlan(dayName, description) {
+  const equipment  = ((S.prefs || {}).equipment || []).join(', ') || 'bodyweight only';
+  const experience = (S.prefs || {}).experience || 'beginner';
+  const userMsg = `Design one workout session for a fitness app.
+Day focus: "${dayName || 'Workout'}"${description ? ` — user's notes: "${description}"` : ''}
+Available equipment: ${equipment}
+Experience level: ${experience}
+Genre theme for exercise names: ${exerciseNameStyle()}
+
+Choose 4 to 7 exercises appropriate to the focus, equipment, and experience level.
+
+Return a single raw JSON object, no markdown fences, no extra text:
+{"label":"short session title, e.g. 'Leg Day — Lower Power'","sub":"~20 min · one-line description","exercises":[{"f":"thematic exercise name","p":"plain exercise name","h":"one sentence how-to / form cue","sets":"e.g. 3 × 12","xp":15}]}`;
+
+  const raw = await callApi([{ role: 'user', content: userMsg }], { maxTokens: 1800 });
+  const parsed = parseJsonLoose(raw, 'object');
+  if (!parsed || !Array.isArray(parsed.exercises) || !parsed.exercises.length) {
+    throw new Error('Could not parse the generated workout — try again.');
+  }
+  return { label: parsed.label, sub: parsed.sub, exercises: normalizeGeneratedExercises(parsed.exercises) };
+}
+
+// Generates a full multi-day plan (an array of sessions) from a free-text description.
+async function generateMultiDayPlan(description, days) {
+  const equipment  = ((S.prefs || {}).equipment || []).join(', ') || 'bodyweight only';
+  const experience = (S.prefs || {}).experience || 'beginner';
+  const userMsg = `Design a ${days}-day workout plan for a fitness app, based on this request: "${description}"
+Available equipment: ${equipment}
+Experience level: ${experience}
+Genre theme for exercise names: ${exerciseNameStyle()}
+
+Each day should have a distinct focus (e.g. legs, push, pull, core, or a no-equipment/home day if requested) with 4 to 7 exercises appropriate to that focus, the available equipment, and the experience level.
+
+Return a single raw JSON array of exactly ${days} day objects, no markdown fences, no extra text:
+[{"tag":"short day name, e.g. 'Leg Day'","label":"session title","sub":"~20 min · one-line description","exercises":[{"f":"thematic exercise name","p":"plain exercise name","h":"one sentence how-to/form cue","sets":"e.g. 3 × 12","xp":15}]}]`;
+
+  const raw = await callApi([{ role: 'user', content: userMsg }], { maxTokens: 5000 });
+  const parsed = parseJsonLoose(raw, 'array');
+  if (!Array.isArray(parsed) || !parsed.length) throw new Error('Could not parse the generated plan — try again.');
+  return parsed.map(d => {
+    const exercises = normalizeGeneratedExercises(d.exercises);
+    return {
+      tag:   String(d.tag || d.label || 'Day'),
+      label: String(d.label || d.tag || 'Day'),
+      sub:   String(d.sub || ''),
+      xp:    exercises.reduce((sum, e) => sum + (e.xp || 0), 0),
+      exercises,
+    };
+  });
+}
+
+let planGenOpen = false;
+
+function togglePlanGenerator() {
+  planGenOpen = !planGenOpen;
+  renderPlanGenPanel();
+}
+
+function renderPlanGenPanel() {
+  const panel = document.getElementById('plan-gen-panel');
+  const toggleBtn = document.getElementById('plan-gen-toggle-btn');
+  if (!panel) return;
+  if (!planGenOpen) {
+    panel.innerHTML = '';
+    if (toggleBtn) toggleBtn.style.display = '';
+    return;
+  }
+  if (toggleBtn) toggleBtn.style.display = 'none';
+  panel.innerHTML = `
+    <div class="ex-edit-form" style="margin-bottom:12px;padding:12px;background:var(--parch);border:1px solid var(--parch4);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">
+      <span class="ex-edit-label">Describe your split <span style="opacity:.5;font-size:9px">(e.g. "4-day split: legs, push, pull, core, plus a no-gym home day")</span></span>
+      <textarea class="ex-edit-ta" id="plan-desc" placeholder="e.g. leg day, push day, pull day, and a dumbbells-only home day for when I skip the gym"></textarea>
+      <span class="ex-edit-label">Number of days</span>
+      <input class="ex-edit-input" id="plan-days" type="number" min="1" max="7" value="${Math.min(7, Math.max(1, getSessions().length || 3))}"/>
+      <div class="ex-edit-actions">
+        <button class="ex-save-btn" id="plan-gen-btn" onclick="generateWeekPlan()">✦ Generate plan</button>
+        <button class="ex-cancel-btn" onclick="togglePlanGenerator()">Cancel</button>
+      </div>
+      <div style="font-size:10px;color:var(--ink4);margin-top:4px">⚠ This replaces all your current days.</div>
+    </div>`;
+}
+
+async function generateWeekPlan() {
+  if (!getApiKey()) { toast('Add an API key in Settings to generate with AI.'); return; }
+  const desc = ((document.getElementById('plan-desc') || {}).value || '').trim();
+  const days = Math.max(1, Math.min(7, parseInt((document.getElementById('plan-days') || {}).value, 10) || 3));
+  if (!desc) { toast('Describe the split you want first.'); return; }
+  if (!confirm(`Generate a ${days}-day plan? This replaces all your current days.`)) return;
+  const btn = document.getElementById('plan-gen-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+  try {
+    const plan = await generateMultiDayPlan(desc, days);
+    S.customSessions = plan;
+    curSess = 0;
+    editingSessMeta = null;
+    save();
+    planGenOpen = false;
+    renderPlanGenPanel();
+    renderSessionTabs();
+    renderWorkoutCard();
+    toast(`✦ ${plan.length}-day plan generated.`);
+  } catch (e) {
+    toast(e.message === 'NO_KEY' ? 'Add an API key in Settings to generate with AI.' : (e.message || 'Generation failed — try again.'));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✦ Generate plan'; }
+  }
 }
 
 function cancelEdit() {
@@ -2573,6 +2747,35 @@ function saveSessMeta(si) {
   save();
   renderSessionTabs();
   renderWorkoutCard();
+}
+
+async function generateSessMeta(si) {
+  if (!getApiKey()) { toast('Add an API key in Settings to generate with AI.'); return; }
+  ensureCustomSessions();
+  const dayName    = ((document.getElementById('sm-tag')  || {}).value || '').trim();
+  const description = ((document.getElementById('sm-desc') || {}).value || '').trim();
+  const btn = document.getElementById('sm-gen-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+  try {
+    const plan = await generateSessionPlan(dayName, description);
+    const sess = S.customSessions[si];
+    if (sess) {
+      sess.label = plan.label || sess.label;
+      sess.sub   = plan.sub   || sess.sub;
+      sess.exercises = plan.exercises;
+      sess.xp = plan.exercises.reduce((sum, e) => sum + (e.xp || 0), 0);
+      if (!sess.tag) sess.tag = dayName || plan.label || 'Workout';
+    }
+    editingSessMeta = null;
+    save();
+    renderSessionTabs();
+    renderWorkoutCard();
+    toast('✦ Workout generated.');
+  } catch (e) {
+    toast(e.message === 'NO_KEY' ? 'Add an API key in Settings to generate with AI.' : (e.message || 'Generation failed — try again.'));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✦ Generate exercises'; }
+  }
 }
 
 function addSession() {
@@ -2718,6 +2921,13 @@ function renderWorkoutCard() {
           <div class="ex-edit-actions">
             <button class="ex-save-btn" onclick="saveSessMeta(${curSess})">Save</button>
             <button class="ex-cancel-btn" onclick="cancelSessMeta()">Cancel</button>
+          </div>
+          <div style="border-top:1px solid var(--parch3);margin-top:10px;padding-top:10px">
+            <span class="ex-edit-label">Describe what you want <span style="opacity:.5;font-size:9px">(optional — AI fills in the exercises)</span></span>
+            <textarea class="ex-edit-ta" id="sm-desc" placeholder="e.g. leg day, dumbbells and bodyweight only, beginner-friendly"></textarea>
+            <div class="ex-edit-actions">
+              <button class="ex-save-btn" id="sm-gen-btn" onclick="generateSessMeta(${curSess})">✦ Generate exercises</button>
+            </div>
           </div>
         </div>`
     : `
@@ -3344,44 +3554,6 @@ Each chapter: 3–4 paragraphs of specific, grounded prose. Focus on character t
 
 Return ONLY a raw JSON array of exactly ${batchSize} strings, one string per chapter. No markdown fences, no explanation:
 ["chapter 1...", "chapter 2...", ...]`;
-
-  // AI prose often contains raw, unescaped newlines/tabs inside JSON string
-  // values, which makes JSON.parse reject otherwise-well-formed output.
-  // Walk the text and escape control characters only while inside a string.
-  function sanitizeJsonControlChars(str) {
-    let out = '', inString = false, esc = false;
-    for (let i = 0; i < str.length; i++) {
-      const ch = str[i];
-      if (inString) {
-        if (esc) { out += ch; esc = false; continue; }
-        if (ch === '\\') { out += ch; esc = true; continue; }
-        if (ch === '"')  { inString = false; out += ch; continue; }
-        if (ch === '\n') { out += '\\n'; continue; }
-        if (ch === '\r') { out += '\\r'; continue; }
-        if (ch === '\t') { out += '\\t'; continue; }
-        out += ch;
-      } else {
-        if (ch === '"') inString = true;
-        out += ch;
-      }
-    }
-    return out;
-  }
-
-  // Last resort when the text isn't valid JSON even after sanitizing: pull out
-  // long quoted strings directly (chapter text), ignoring short ones (JSON keys).
-  function extractQuotedStrings(raw) {
-    const re = /"((?:[^"\\]|\\.)*)"/g;
-    const out = [];
-    let m;
-    while ((m = re.exec(raw))) {
-      try {
-        const s = JSON.parse('"' + m[1] + '"');
-        if (s.trim().length > 80) out.push(s);
-      } catch (_) { /* skip malformed fragment */ }
-    }
-    return out;
-  }
 
   function parseChapters(raw) {
     let clean = raw;
@@ -4177,6 +4349,52 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 // For AI narrative text rendered as paragraphs — strips tags but keeps structure
+// AI prose often contains raw, unescaped newlines/tabs inside JSON string
+// values, which makes JSON.parse reject otherwise-well-formed output.
+// Walk the text and escape control characters only while inside a string.
+function sanitizeJsonControlChars(str) {
+  let out = '', inString = false, esc = false;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (inString) {
+      if (esc) { out += ch; esc = false; continue; }
+      if (ch === '\\') { out += ch; esc = true; continue; }
+      if (ch === '"')  { inString = false; out += ch; continue; }
+      if (ch === '\n') { out += '\\n'; continue; }
+      if (ch === '\r') { out += '\\r'; continue; }
+      if (ch === '\t') { out += '\\t'; continue; }
+      out += ch;
+    } else {
+      if (ch === '"') inString = true;
+      out += ch;
+    }
+  }
+  return out;
+}
+
+// Last resort when the text isn't valid JSON even after sanitizing: pull out
+// long quoted strings directly (chapter text), ignoring short ones (JSON keys).
+function extractQuotedStrings(raw) {
+  const re = /"((?:[^"\\]|\\.)*)"/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(raw))) {
+    try {
+      const s = JSON.parse('"' + m[1] + '"');
+      if (s.trim().length > 80) out.push(s);
+    } catch (_) { /* skip malformed fragment */ }
+  }
+  return out;
+}
+
+// Detects chapters that were saved before the JSON-parsing fix and still
+// contain literal {"title":...,"chapters":[...]} structure instead of prose.
+function isCorruptedChapterText(c) {
+  const t = String(c || '').trim();
+  if (!t) return false;
+  return (t[0] === '{' || t[0] === '[') && /"(title|premise|chapters)"\s*:/.test(t.slice(0, 300));
+}
+
 function storyToHtml(text) {
   const s = String(text);
   // Normalise single-\n paragraph breaks (AI JSON output) to \n\n so the split below works
@@ -5159,6 +5377,13 @@ function init() {
     if (el) el.value = prefs[k + 'Note'] || '';
   });
   renderAll();
+  if (_storyRepairedNote) {
+    save();
+    toast(_storyRepairedNote === 'recovered'
+      ? 'Your story had a display glitch — recovered it.'
+      : 'Your last story arc failed to generate correctly — tap "Continue the story" to try again.');
+    _storyRepairedNote = null;
+  }
   if (S.setupComplete) checkAndTopUp();
 
   if (!S.setupComplete) {
