@@ -1,4 +1,4 @@
-﻿const CACHE = 'kat-rpg-v2';
+﻿const CACHE = 'kat-rpg-v3';
 const CORE  = ['./index.html', './icon-192.png', './icon-512.png', './manifest.json'];
 
 // â”€â”€ Install / Activate / Fetch (unchanged) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

@@ -3345,6 +3345,44 @@ Each chapter: 3–4 paragraphs of specific, grounded prose. Focus on character t
 Return ONLY a raw JSON array of exactly ${batchSize} strings, one string per chapter. No markdown fences, no explanation:
 ["chapter 1...", "chapter 2...", ...]`;
 
+  // AI prose often contains raw, unescaped newlines/tabs inside JSON string
+  // values, which makes JSON.parse reject otherwise-well-formed output.
+  // Walk the text and escape control characters only while inside a string.
+  function sanitizeJsonControlChars(str) {
+    let out = '', inString = false, esc = false;
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+      if (inString) {
+        if (esc) { out += ch; esc = false; continue; }
+        if (ch === '\\') { out += ch; esc = true; continue; }
+        if (ch === '"')  { inString = false; out += ch; continue; }
+        if (ch === '\n') { out += '\\n'; continue; }
+        if (ch === '\r') { out += '\\r'; continue; }
+        if (ch === '\t') { out += '\\t'; continue; }
+        out += ch;
+      } else {
+        if (ch === '"') inString = true;
+        out += ch;
+      }
+    }
+    return out;
+  }
+
+  // Last resort when the text isn't valid JSON even after sanitizing: pull out
+  // long quoted strings directly (chapter text), ignoring short ones (JSON keys).
+  function extractQuotedStrings(raw) {
+    const re = /"((?:[^"\\]|\\.)*)"/g;
+    const out = [];
+    let m;
+    while ((m = re.exec(raw))) {
+      try {
+        const s = JSON.parse('"' + m[1] + '"');
+        if (s.trim().length > 80) out.push(s);
+      } catch (_) { /* skip malformed fragment */ }
+    }
+    return out;
+  }
+
   function parseChapters(raw) {
     let clean = raw;
     const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -3354,7 +3392,9 @@ Return ONLY a raw JSON array of exactly ${batchSize} strings, one string per cha
       const arrMatch = raw.match(/\[[\s\S]*\]/);
       clean = (objMatch || arrMatch || [raw])[0].trim();
     }
-    const parsed = JSON.parse(clean);
+    let parsed;
+    try { parsed = JSON.parse(clean); }
+    catch { parsed = JSON.parse(sanitizeJsonControlChars(clean)); }
     if (Array.isArray(parsed)) return { chapters: parsed };
     if (parsed.chapters) return { title: parsed.title, premise: parsed.premise, chapters: parsed.chapters };
     throw new Error('unrecognised shape');
@@ -3375,8 +3415,18 @@ Return ONLY a raw JSON array of exactly ${batchSize} strings, one string per cha
       ({ title, premise, chapters } = parseChapters(raw));
       if (!Array.isArray(chapters) || !chapters.length) throw new Error();
     } catch {
-      chapters = raw.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
-      if (!chapters.length) chapters = [raw.trim()];
+      // JSON parsing failed outright — if the response still looks like JSON
+      // (starts with { or [), never show that raw structure as story text.
+      const looksLikeJson = /^\s*[\{\[]/.test(raw);
+      const extracted = looksLikeJson ? extractQuotedStrings(raw) : [];
+      if (extracted.length) {
+        chapters = extracted;
+      } else if (!looksLikeJson) {
+        chapters = raw.split(/\n\n+/).map(s => s.trim()).filter(Boolean);
+        if (!chapters.length) chapters = [raw.trim()];
+      } else {
+        throw new Error('Could not parse story response.');
+      }
     }
     chapters = chapters.map(normChapter);
 
