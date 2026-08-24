@@ -683,6 +683,42 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 .lvup-btn:hover:not(:disabled) { background: var(--gold); color: var(--parch); }
 .lvup-btn:disabled { opacity: .45; cursor: not-allowed; }
 
+/* ── PASSPHRASE LOCK ─────────────────────────────────────────── */
+.lock-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(44,36,22,.92);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.lock-overlay.hidden { display: none; }
+.lock-card {
+  background: var(--parch); border: 1px solid var(--parch4);
+  border-radius: var(--radius-lg);
+  width: 100%; max-width: 320px;
+  box-shadow: 0 8px 40px rgba(44,36,22,.35);
+  padding: 26px 22px; text-align: center;
+  animation: fadeUp .3s ease;
+}
+.lock-card.shake { animation: lockShake .4s; }
+@keyframes lockShake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-7px); }
+  40%, 60% { transform: translateX(7px); }
+}
+.lock-icon  { font-size: 32px; margin-bottom: 10px; }
+.lock-title { font-family: var(--font-display); font-size: 15px; color: var(--ink); letter-spacing: .05em; margin-bottom: 6px; }
+.lock-sub   { font-family: var(--font-story); font-size: 12px; color: var(--ink3); font-style: italic; margin-bottom: 18px; line-height: 1.5; }
+.lock-input {
+  width: 100%; padding: 11px 13px; margin-bottom: 8px; box-sizing: border-box;
+  border: 1px solid var(--parch4); border-radius: var(--radius);
+  background: var(--parch3); color: var(--ink); font-size: 14px;
+  text-align: center; letter-spacing: .1em;
+}
+.lock-input:focus { outline: none; border-color: var(--gold); }
+.lock-err { font-size: 11px; color: var(--rose2); min-height: 15px; margin-bottom: 6px; }
+
 /* ── SETUP WIZARD ────────────────────────────────────────────── */
 .wizard-overlay {
   position: fixed; inset: 0; z-index: 500;
@@ -896,6 +932,29 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 </style>
 </head>
 <body>
+
+<!-- ── PASSPHRASE LOCK ───────────────────────────────────────── -->
+<div class="lock-overlay" id="lock-overlay">
+  <div class="lock-card" id="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">Reps &amp; Relics</div>
+    <div class="lock-sub">Enter the passphrase to continue.</div>
+    <input class="lock-input" id="lock-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Passphrase" onkeydown="if(event.key==='Enter')tryUnlock()"/>
+    <div class="lock-err" id="lock-err"></div>
+    <button class="lvup-btn" id="lock-btn" onclick="tryUnlock()">Unlock</button>
+  </div>
+</div>
+<script>
+  // Runs synchronously, before the rest of the page parses, so an already-
+  // unlocked device never sees a flash of the lock screen on repeat visits.
+  (function() {
+    try {
+      if (localStorage.getItem('kat_rpg_unlocked') === '1') {
+        document.getElementById('lock-overlay').classList.add('hidden');
+      }
+    } catch (e) {}
+  })();
+</script>
 
 <!-- ── LEVEL-UP MODAL ────────────────────────────────────────── -->
 <div class="lvup-modal hidden" id="levelup-modal">
@@ -1255,6 +1314,17 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
     <div class="saves-list" id="saves-list"></div>
   </div>
 
+  <div class="sect">Privacy</div>
+  <div class="setting-group">
+    <div class="s-row">
+      <div>
+        <div class="s-lbl">Passphrase lock</div>
+        <div class="s-sub">This device stays unlocked until you lock it again — useful if you're on a shared or public computer.</div>
+      </div>
+      <button class="s-btn" onclick="lockNow()">Lock now</button>
+    </div>
+  </div>
+
   <div class="sect">Data</div>
   <div class="setting-group">
     <div class="s-row"><div>
@@ -1302,6 +1372,54 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 </div>
 
 <script>
+/* ════════════════════════════════════════════════════════════════
+   PASSPHRASE LOCK
+════════════════════════════════════════════════════════════════ */
+// SHA-256 of the passphrase — the plain text is never stored in the page.
+const LOCK_HASH = 'f6a2a9249bfe692a91b135135169745fb4ff2876f755a9deab2f3e038c0d8a50';
+
+async function sha256Hex(text) {
+  const bytes  = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function tryUnlock() {
+  const input = document.getElementById('lock-input');
+  const err   = document.getElementById('lock-err');
+  const card  = document.getElementById('lock-card');
+  const btn   = document.getElementById('lock-btn');
+  const val   = (input.value || '').trim();
+  if (!val) return;
+  if (!(window.crypto && window.crypto.subtle)) {
+    err.textContent = 'Unlock isn\'t supported in this browser.';
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const hash = await sha256Hex(val);
+    if (hash === LOCK_HASH) {
+      try { localStorage.setItem('kat_rpg_unlocked', '1'); } catch (e) {}
+      document.getElementById('lock-overlay').classList.add('hidden');
+      err.textContent = '';
+    } else {
+      err.textContent = 'Incorrect passphrase.';
+      input.value = '';
+      input.focus();
+      card.classList.remove('shake');
+      void card.offsetWidth; // restart animation
+      card.classList.add('shake');
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function lockNow() {
+  try { localStorage.removeItem('kat_rpg_unlocked'); } catch (e) {}
+  location.reload();
+}
+
 /* ════════════════════════════════════════════════════════════════
    DATA — narrative arcs
 ════════════════════════════════════════════════════════════════ */
