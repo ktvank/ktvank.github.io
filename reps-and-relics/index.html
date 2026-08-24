@@ -290,6 +290,8 @@ body {
 .sess-tab.active { background: var(--sage4); border-color: var(--sage3); color: var(--sage2); box-shadow: var(--shadow); }
 .sess-tab.done-today { opacity: .5; }
 .sess-tab.done-today.active { opacity: .75; }
+.sess-tab-add { flex: 0 0 auto; min-width: 40px; border-style: dashed; opacity: .65; }
+.sess-tab-add:hover { opacity: 1; border-color: var(--sage3); color: var(--sage2); }
 
 .workout-card {
   background: var(--parch); border: 1px solid var(--parch4);
@@ -2392,12 +2394,12 @@ function renderSessionTabs() {
 
   const SESS_INTENT_LABELS = ['Recommended', 'Alternate', 'Push Yourself!'];
   tabContainer.innerHTML = sessions.map((sess, i) => {
-    const label = SESS_INTENT_LABELS[i] || `Session ${String.fromCharCode(65 + i)}`;
+    const label = sess.tag || SESS_INTENT_LABELS[i] || `Session ${String.fromCharCode(65 + i)}`;
     const done  = sessCompletedToday(i);
     return `<button class="sess-tab ${i === curSess ? 'active' : ''} ${done ? 'done-today' : ''}" onclick="setSess(${i},this)">
-      ${label}<br><span style="font-size:8px;opacity:.7">${done ? '✓ done today' : 'Session ' + String.fromCharCode(65 + i)}</span>
+      ${escHtml(label)}<br><span style="font-size:8px;opacity:.7">${done ? '✓ done today' : 'Session ' + String.fromCharCode(65 + i)}</span>
     </button>`;
-  }).join('');
+  }).join('') + `<button class="sess-tab sess-tab-add" onclick="addSession()" title="Add a new day type" aria-label="Add a new day type">+<br><span style="font-size:8px;opacity:.7">New day</span></button>`;
 
   // Update beginner note based on prefs
   const note = document.getElementById('beg-note');
@@ -2418,6 +2420,7 @@ function setSess(i, btn) {
 }
 
 let editingExercise = null; // { si, ei }
+let editingSessMeta = null; // index of session whose day-name/title is being edited
 
 function ensureCustomSessions() {
   if (!S.customSessions || S.customSessions.length === 0) {
@@ -2543,6 +2546,59 @@ function cancelEdit() {
   renderWorkoutCard();
 }
 
+function editSessMeta(si) {
+  ensureCustomSessions();
+  editingSessMeta = si;
+  editingExercise = null;
+  renderWorkoutCard();
+}
+
+function cancelSessMeta() {
+  editingSessMeta = null;
+  renderWorkoutCard();
+}
+
+function saveSessMeta(si) {
+  ensureCustomSessions();
+  const tagV   = ((document.getElementById('sm-tag')   || {}).value || '').trim();
+  const labelV = ((document.getElementById('sm-label') || {}).value || '').trim();
+  const subV   = ((document.getElementById('sm-sub')   || {}).value || '').trim();
+  const sess = S.customSessions[si];
+  if (sess) {
+    sess.tag = tagV;
+    if (labelV) sess.label = labelV;
+    sess.sub = subV;
+  }
+  editingSessMeta = null;
+  save();
+  renderSessionTabs();
+  renderWorkoutCard();
+}
+
+function addSession() {
+  ensureCustomSessions();
+  S.customSessions.push({
+    label: 'New Day', sub: 'Custom session — add your own exercises', xp: 15, tag: 'New Day',
+    exercises: [{ f: 'New Exercise', p: 'New exercise', h: '', sets: '3 × 10', xp: 15 }]
+  });
+  curSess = S.customSessions.length - 1;
+  save();
+  renderSessionTabs();
+  editSessMeta(curSess);
+}
+
+function deleteSession(si) {
+  ensureCustomSessions();
+  if (S.customSessions.length <= 1) { toast('You need at least one session.'); return; }
+  if (!confirm('Delete this day? Its exercises will be removed.')) return;
+  S.customSessions.splice(si, 1);
+  if (curSess >= S.customSessions.length) curSess = S.customSessions.length - 1;
+  editingSessMeta = null;
+  save();
+  renderSessionTabs();
+  renderWorkoutCard();
+}
+
 function showDiffNudge() {
   const el = document.getElementById('diff-nudge');
   if (el) { el.classList.remove('hidden'); }
@@ -2650,15 +2706,33 @@ function renderWorkoutCard() {
     : '';
 
   const isAdjusting = !!document.getElementById('diff-spinner-' + curSess);
+  const sessMetaEditing = editingSessMeta === curSess;
+  const headerLeft = sessMetaEditing ? `
+        <div class="ex-edit-form" style="margin-bottom:8px">
+          <span class="ex-edit-label">Day name <span style="opacity:.5;font-size:9px">(e.g. "Leg Day")</span></span>
+          <input class="ex-edit-input" id="sm-tag" placeholder="e.g. Leg Day" value="${escHtml(sess.tag || '')}"/>
+          <span class="ex-edit-label">Title</span>
+          <input class="ex-edit-input" id="sm-label" value="${escHtml(sess.label)}"/>
+          <span class="ex-edit-label">Subtitle <span style="opacity:.5;font-size:9px">(optional)</span></span>
+          <input class="ex-edit-input" id="sm-sub" value="${escHtml(sess.sub)}"/>
+          <div class="ex-edit-actions">
+            <button class="ex-save-btn" onclick="saveSessMeta(${curSess})">Save</button>
+            <button class="ex-cancel-btn" onclick="cancelSessMeta()">Cancel</button>
+          </div>
+        </div>`
+    : `
+        <div class="workout-title">${escHtml(sess.label)}</div>
+        <div class="workout-sub">${escHtml(sess.sub)} &nbsp;·&nbsp; +${sess.xp} XP</div>`;
   document.getElementById('workout-card').innerHTML = `
     <div class="workout-header">
-      <div class="workout-header-left">
-        <div class="workout-title">${escHtml(sess.label)}</div>
-        <div class="workout-sub">${escHtml(sess.sub)} &nbsp;·&nbsp; +${sess.xp} XP</div>
-      </div>
+      <div class="workout-header-left">${headerLeft}</div>
       <div class="diff-btns" id="diff-btns-${curSess}">
+        ${sessMetaEditing ? '' : `
+        <button class="diff-btn" onclick="editSessMeta(${curSess})" title="Rename this day">✎ Rename</button>
         <button class="diff-btn" onclick="adjustDifficulty(${curSess},-1)" title="Fewer reps or easier variations">↓ Dial back</button>
         <button class="diff-btn" onclick="adjustDifficulty(${curSess},+1)" title="More reps or harder variations">↑ Push it</button>
+        ${sessions.length > 1 ? `<button class="diff-btn" onclick="deleteSession(${curSess})" title="Delete this day">🗑 Delete</button>` : ''}
+        `}
       </div>
     </div>
     <ul class="ex-list">
