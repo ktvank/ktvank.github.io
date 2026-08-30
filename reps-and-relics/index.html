@@ -962,7 +962,25 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 .companion-card.locked { opacity: .5; cursor: default; }
 
 .companion-card-top { display: flex; align-items: center; gap: 12px; }
-.companion-card-icon { font-size: 32px; line-height: 1; flex-shrink: 0; }
+.companion-card-icon {
+  font-size: 30px; line-height: 1; flex-shrink: 0;
+  width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
+}
+.portrait-img { display: block; object-fit: cover; border-radius: 50%; background: var(--parch3); }
+.companion-card-icon .portrait-img { width: 42px; height: 42px; }
+.kat-portrait .portrait-img { position: absolute; inset: -2px; width: calc(100% + 4px); height: calc(100% + 4px); border: 2px solid var(--parch4); }
+.portrait-slot { position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; }
+.portrait-slot .portrait-emoji { font-size: 30px; line-height: 1; }
+.portrait-regen {
+  position: absolute; bottom: -3px; right: -3px;
+  width: 18px; height: 18px; border-radius: 50%; padding: 0;
+  border: 1px solid var(--parch4); background: var(--parch); color: var(--ink3);
+  font-size: 10px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .15s;
+}
+.companion-card:hover .portrait-regen, .portrait-slot:active .portrait-regen { opacity: 1; }
+.portrait-regen:hover { color: var(--sage2); border-color: var(--sage3); }
+@media (hover: none) { .portrait-regen { opacity: .85; } }
 .companion-card-name { font-family: var(--font-display); font-size: 13px; color: var(--ink); letter-spacing: .04em; }
 .companion-card-intro { font-family: var(--font-story); font-size: 12px; color: var(--ink3); font-style: italic; margin-top: 2px; line-height: 1.5; }
 .companion-card-req { font-size: 10px; color: var(--ink4); margin-top: 3px; }
@@ -1434,6 +1452,13 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
           <div class="s-sub">Switch to a dark interface. Works across all genres.</div>
         </div>
         <button class="s-btn" id="dark-mode-btn" onclick="toggleDarkMode()" style="min-width:52px"></button>
+      </div>
+      <div class="s-row" style="margin-top:14px">
+        <div>
+          <div class="s-lbl">AI portraits</div>
+          <div class="s-sub">Generate a picture for your hero and each companion via a free public image service (pollinations.ai). Falls back to the class icon. Character names/descriptions are sent to that service.</div>
+        </div>
+        <button class="s-btn" id="portraits-btn" onclick="togglePortraits(this)" style="min-width:52px"></button>
       </div>
     </div>
 
@@ -2741,6 +2766,8 @@ let S = {
   pauseUntil:      null,  // ISO date string — streak & reminders frozen until this date
   offDays:         [],    // ISO date strings marked as intentional rest days
   earnedTitles:    [],    // 2-word epithets generated at every 5th level
+  heroPortrait:    '',    // data URL (or live URL) for the hero's generated portrait
+  heroPortraitN:   0,     // regen counter — bumps the seed on redraw
   // ── shared training core (Phase 4) — spans every narrative ──
   baselines:       {},    // exId/name key → { kind, sets, repRange, targetReps, load, readyStreak, struggleStreak, … }
   workoutLog:      [],     // [{ date, narrativeId, role, entries:[{key,name,feel}] }]
@@ -2881,7 +2908,7 @@ const NARRATIVE_FIELDS = [
   'customSessions', 'levelLoot', 'earnedTitles',
   'customLoot', 'customBadges', 'customLevelLoot', 'customReminders',
   'loreNotes', 'companionsSeen', 'companionCandidates', 'generatedCompanions',
-  'exerciseChecked', 'charFlags',
+  'exerciseChecked', 'charFlags', 'heroPortrait', 'heroPortraitN',
 ];
 // completedToday / completedSessList stay on the SHARED CORE, not here: you have
 // one body and one training day, so "done today" must hold across every narrative
@@ -2976,6 +3003,7 @@ async function createNarrative({ genre, tone, heroClass, name, label }) {
   S.loreNotes = []; S.companionsSeen = []; S.companionCandidates = []; S.generatedCompanions = [];
   S.exerciseChecked = {};  // completedToday / completedSessList are shared core — don't reset
   S.charFlags = [];
+  S.heroPortrait = ''; S.heroPortraitN = 0;
   if (!S.prefs) S.prefs = {};
   if (genre) S.prefs.genre = genre;
   if (tone) S.prefs.tone = tone;
@@ -3354,7 +3382,9 @@ function renderHero() {
   // Update avatar/name from prefs
   const prefs = S.prefs || {};
   const classData = getClassData(prefs.genre, prefs.heroClass);
-  document.getElementById('kat-avatar').textContent = classData.icon;
+  const avEl = document.getElementById('kat-avatar');
+  if (S.heroPortrait) avEl.innerHTML = portraitImg(S.heroPortrait, classData.icon);
+  else { avEl.textContent = classData.icon; if (portraitsOn()) ensureHeroPortrait(); }
   document.getElementById('kat-name').textContent = heroName();
 
   const nextXP = XP_LVS[Math.min(lv, XP_LVS.length - 1)] || 9999;
@@ -5897,15 +5927,115 @@ function getCompanions() {
 function getUnlockedCompanions() {
   return getCompanions().filter(c => S.sessions >= (c.req || 0));
 }
+
+/* ════════════════════════════════════════════════════════════════
+   CHARACTER PORTRAITS — one per character, generated once via the free
+   keyless Pollinations image service, cached as a data URL in the save.
+   The class emoji stays the fallback for outages / disabled / filtered.
+════════════════════════════════════════════════════════════════ */
+const PORTRAIT_STYLE = {
+  fantasy: 'painterly high-fantasy character portrait, warm torchlight, muted earthy palette, head and shoulders, plain parchment background',
+  scifi:   'sleek sci-fi character portrait, cool cyan rim light, matte palette, head and shoulders, plain dark background',
+  mystery: 'noir character portrait, hard chiaroscuro light, desaturated sepia, head and shoulders, plain shadowed background',
+  cozy:    'soft storybook character portrait, gentle daylight, warm pastels, head and shoulders, plain cream background',
+  anime:   'clean anime character portrait, cel shading, bright saturated palette, head and shoulders, plain gradient background',
+};
+function portraitsOn() { return (S.prefs || {}).portraits !== false; }
+function _seed(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h) % 100000; }
+function _pollUrl(prompt, seed) {
+  return 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt.slice(0, 400)) +
+    '?width=384&height=384&model=flux&seed=' + seed + '&nologo=true&safe=true';
+}
+async function _fetchPortrait(prompt, seed) {
+  const url = _pollUrl(prompt, seed);
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw 0;
+    const b = await r.blob();
+    if (!b.type.startsWith('image/') || b.size < 1200) throw 0;
+    return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+  } catch (_) {
+    return url;   // couldn't cache — the live URL still renders in an <img>
+  }
+}
+function heroPortraitPrompt() {
+  const p = S.prefs || {};
+  const cls = getClassData(p.genre, p.heroClass);
+  const pr = heroPronouns();
+  const gender = pr.sub === 'he' ? 'man' : pr.sub === 'she' ? 'woman' : 'person';
+  const persona = (p.personalityNote || '').replace(/[^\w ,'-]/g, '').slice(0, 70);
+  return `${PORTRAIT_STYLE[p.genre] || PORTRAIT_STYLE.fantasy}. A ${gender}, a ${String(cls.label).toLowerCase()} — ${cls.desc}${persona ? '. ' + persona : ''}. Resolute expression, facing the viewer.`;
+}
+function companionPortraitPrompt(c) {
+  const g = (S.prefs || {}).genre || 'fantasy';
+  const look = (c.appearance || c.profile || c.name).replace(/[^\w ,'.-]/g, '').slice(0, 240);
+  return `${PORTRAIT_STYLE[g] || PORTRAIT_STYLE.fantasy}. ${look}. Facing the viewer.`;
+}
+const _portraitBusy = new Set();
+async function ensureHeroPortrait() {
+  if (!portraitsOn() || S.heroPortrait || _portraitBusy.has('hero')) return;
+  _portraitBusy.add('hero');
+  try {
+    S.heroPortrait = await _fetchPortrait(heroPortraitPrompt(), _seed((S.activeNarrativeId || '') + '|hero|' + heroName() + '|' + (S.heroPortraitN || 0)));
+    save(); renderHero(); renderCompanionsPanel();
+  } catch (_) {} finally { _portraitBusy.delete('hero'); }
+}
+async function ensureCompanionPortrait(c) {
+  if (!portraitsOn() || !c || c.portrait || _portraitBusy.has(c.id)) return;
+  _portraitBusy.add(c.id);
+  try {
+    c.portrait = await _fetchPortrait(companionPortraitPrompt(c), _seed((S.activeNarrativeId || '') + '|' + c.id + '|' + c.name + '|' + (c.portraitN || 0)));
+    save(); renderCompanionsPanel();
+  } catch (_) {} finally { _portraitBusy.delete(c.id); }
+}
+// Redo a portrait that came out wrong — new seed each time.
+function regenerateHeroPortrait() {
+  S.heroPortraitN = (S.heroPortraitN || 0) + 1;
+  S.heroPortrait = '';
+  save(); renderHero(); renderCompanionsPanel();
+  toast('Redrawing your portrait…');
+  ensureHeroPortrait();
+}
+function regenerateCompanionPortrait(id) {
+  const c = (S.generatedCompanions || []).find(x => x.id === id);
+  if (!c) return;
+  c.portraitN = (c.portraitN || 0) + 1;
+  c.portrait = '';
+  save(); renderCompanionsPanel();
+  toast('Redrawing portrait…');
+  ensureCompanionPortrait(c);
+}
+// <img> that falls back to the emoji if the portrait fails to load.
+function portraitImg(src, emoji) {
+  return `<img class="portrait-img" src="${escHtml(src)}" alt="" loading="lazy"
+    onerror="this.replaceWith(document.createTextNode('${emoji}'))">`;
+}
+// icon slot + (when portraits are on) a small "redraw" button
+function portraitSlot(src, emoji, regenCall) {
+  return `<div class="portrait-slot">
+    ${src ? portraitImg(src, emoji) : `<span class="portrait-emoji">${emoji}</span>`}
+    ${portraitsOn() ? `<button class="portrait-regen" title="Redraw portrait" aria-label="Redraw portrait"
+      onclick="event.stopPropagation();${regenCall}"><i class="ti ti-refresh"></i></button>` : ''}
+  </div>`;
+}
+function togglePortraits(btn) {
+  if (!S.prefs) S.prefs = {};
+  S.prefs.portraits = !portraitsOn();
+  save();
+  if (btn) btn.textContent = portraitsOn() ? 'On' : 'Off';
+  if (portraitsOn()) { ensureHeroPortrait(); (S.generatedCompanions || []).forEach(ensureCompanionPortrait); }
+  renderHero(); renderCompanionsPanel();
+}
 function renderCompanionsPanel() {
   const grid = document.getElementById('companions-grid');
   if (!grid) return;
   const _hp = S.prefs || {};
   const heroIcon = getClassData(_hp.genre, _hp.heroClass).icon;
+  if (portraitsOn() && !S.heroPortrait) ensureHeroPortrait();
   const heroCard = `
     <div class="companion-card hero-card" onclick="showHeroQuip()">
       <div class="companion-card-top">
-        <div class="companion-card-icon">${heroIcon}</div>
+        <div class="companion-card-icon">${portraitSlot(S.heroPortrait, heroIcon, 'regenerateHeroPortrait()')}</div>
         <div class="companion-card-info">
           <div class="companion-card-name">${escHtml(heroName())} <span style="font-size:9px;color:var(--sage2);font-family:var(--font-display);letter-spacing:.06em">YOU</span></div>
           <div class="companion-card-intro">${escHtml(getTitle())}</div>
@@ -5918,11 +6048,12 @@ function renderCompanionsPanel() {
   // Generated companions (skip COMPANIONS[0] = Kat, who is the hero's own voice)
   const generated = S.generatedCompanions || [];
   const filledSlots = new Set(generated.map(c => c.req));
+  if (portraitsOn()) generated.forEach(c => { if (!c.portrait) ensureCompanionPortrait(c); });
   const companionCards = [
     ...generated.map(c => `
       <div class="companion-card" onclick="showCompanionQuip('${c.id}')">
         <div class="companion-card-top">
-          <div class="companion-card-icon">${c.icon}</div>
+          <div class="companion-card-icon">${portraitSlot(c.portrait, c.icon, `regenerateCompanionPortrait('${c.id}')`)}</div>
           <div class="companion-card-info">
             <div class="companion-card-name">${escHtml(c.name)}</div>
             <div class="companion-card-intro">${escHtml(c.intro)}</div>
@@ -6102,7 +6233,8 @@ Generate a companion profile as raw JSON (no markdown):
   "icon": "single emoji that fits them",
   "intro": "one punchy sentence (max 10 words) for the unlock banner",
   "profile": "2-3 sentences: who they are, their defining quirks, their relationship to the hero — written as a character bible entry, present tense",
-  "voice": "1 sentence describing HOW they speak: pace, register, recurring habits or tics"
+  "voice": "1 sentence describing HOW they speak: pace, register, recurring habits or tics",
+  "appearance": "a compact visual description for a portrait: species/human, apparent age, build, hair, skin, notable features (scars, beard, cybernetics, etc.), and typical attire — consistent with anything the story has established. ~25 words, comma-separated, no sentences."
 }`;
 
   try {
@@ -6120,6 +6252,7 @@ Generate a companion profile as raw JSON (no markdown):
       intro:   data.intro || `${data.name} has joined your party.`,
       profile: data.profile || '',
       voice:   data.voice   || 'Keep responses concise — 2–3 sentences.',
+      appearance: data.appearance || '',
     };
     if (!S.generatedCompanions) S.generatedCompanions = [];
     S.generatedCompanions.push(companion);
@@ -6533,6 +6666,8 @@ function renderAppearanceSettings() {
   btn.style.background  = on ? 'var(--sage3)' : '';
   btn.style.borderColor = on ? 'var(--sage2)' : '';
   btn.style.color       = on ? 'var(--sage2)' : '';
+  const pbtn = document.getElementById('portraits-btn');
+  if (pbtn) pbtn.textContent = portraitsOn() ? 'On' : 'Off';
 }
 
 function sSet(btn) {
