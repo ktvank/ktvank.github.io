@@ -5933,12 +5933,13 @@ function getUnlockedCompanions() {
    keyless Pollinations image service, cached as a data URL in the save.
    The class emoji stays the fallback for outages / disabled / filtered.
 ════════════════════════════════════════════════════════════════ */
+// Kept short on purpose — long prompts dilute; the model weights every token.
 const PORTRAIT_STYLE = {
-  fantasy: 'painterly high-fantasy character portrait, warm torchlight, muted earthy palette, head and shoulders, plain parchment background',
-  scifi:   'sleek sci-fi character portrait, cool cyan rim light, matte palette, head and shoulders, plain dark background',
-  mystery: 'noir character portrait, hard chiaroscuro light, desaturated sepia, head and shoulders, plain shadowed background',
-  cozy:    'soft storybook character portrait, gentle daylight, warm pastels, head and shoulders, plain cream background',
-  anime:   'clean anime character portrait, cel shading, bright saturated palette, head and shoulders, plain gradient background',
+  fantasy: 'painterly fantasy portrait, warm torchlight, earthy palette',
+  scifi:   'sci-fi portrait, cool cyan light, matte palette',
+  mystery: 'noir portrait, hard shadows, sepia palette',
+  cozy:    'storybook portrait, soft daylight, warm pastels',
+  anime:   'anime portrait, cel shading, bright palette',
 };
 const PORTRAIT_TONE = {
   humorous: 'characterful, lively, slightly exaggerated features',
@@ -5953,9 +5954,30 @@ function _portraitStyle() {
 }
 function portraitsOn() { return (S.prefs || {}).portraits !== false; }
 function _seed(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h) % 100000; }
+// The portraits render at 42–64px, so 320 is plenty (headroom for 3× screens).
 function _pollUrl(prompt, seed) {
-  return 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt.slice(0, 400)) +
-    '?width=384&height=384&model=flux&seed=' + seed + '&nologo=true&safe=true';
+  return 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt.slice(0, 320)) +
+    '?width=320&height=320&model=flux&seed=' + seed + '&nologo=true&safe=true';
+}
+// Downscale + recompress the fetched image to a small square JPEG data URL
+// (~5–12 KB) so a full party is well under 100 KB in the save.
+function _shrinkToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const S2 = 192, c = document.createElement('canvas');
+        c.width = c.height = S2;
+        const ctx = c.getContext('2d');
+        const s = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, S2, S2);
+        resolve(c.toDataURL('image/jpeg', 0.82));
+      } catch (e) { reject(e); }
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(blob);
+  });
 }
 async function _fetchPortrait(prompt, seed) {
   const url = _pollUrl(prompt, seed);
@@ -5964,7 +5986,10 @@ async function _fetchPortrait(prompt, seed) {
     if (!r.ok) throw 0;
     const b = await r.blob();
     if (!b.type.startsWith('image/') || b.size < 1200) throw 0;
-    return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+    try { return await _shrinkToDataURL(b); }
+    catch (_) {
+      return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+    }
   } catch (_) {
     return url;   // couldn't cache — the live URL still renders in an <img>
   }
@@ -5974,12 +5999,12 @@ function heroPortraitPrompt() {
   const cls = getClassData(p.genre, p.heroClass);
   const pr = heroPronouns();
   const gender = pr.sub === 'he' ? 'man' : pr.sub === 'she' ? 'woman' : 'person';
-  const persona = (p.personalityNote || '').replace(/[^\w ,'-]/g, '').slice(0, 70);
-  return `${_portraitStyle()}. A ${gender}, a ${String(cls.label).toLowerCase()} — ${cls.desc}${persona ? '. ' + persona : ''}. Facing the viewer.`;
+  const persona = (p.personalityNote || '').replace(/[^\w ,'-]/g, '').slice(0, 50);
+  return `${_portraitStyle()}, head and shoulders, plain background. A ${gender} ${String(cls.label).toLowerCase()}${persona ? ', ' + persona : ''}, facing viewer.`;
 }
 function companionPortraitPrompt(c) {
-  const look = (c.appearance || c.profile || c.name).replace(/[^\w ,'.-]/g, '').slice(0, 240);
-  return `${_portraitStyle()}. ${look}. Facing the viewer.`;
+  const look = (c.appearance || c.profile || c.name).replace(/[^\w ,'.-]/g, '').slice(0, 180);
+  return `${_portraitStyle()}, head and shoulders, plain background. ${look}, facing viewer.`;
 }
 const _portraitBusy = new Set();
 async function ensureHeroPortrait() {
