@@ -6,7 +6,7 @@
   ║  Fonts: Google Fonts (Cinzel, Lora, Crimson Pro)             ║
   ║  Icons: Tabler Icons webfont                                  ║
   ║  API: Anthropic or OpenAI (direct browser, user-supplied key)║
-  ║  Storage: localStorage ("kat_rpg_v3")                        ║
+  ║  Storage: localStorage ("kat_rpg_v4")                        ║
   ╚══════════════════════════════════════════════════════════════╝
 -->
 <html lang="en">
@@ -179,6 +179,19 @@ body {
 .panel.active { display: block; animation: fadeUp .3s ease; }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
+/* ── OPTIONS SUB-TABS ────────────────────────────────────────── */
+.opt-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--parch4); }
+.opt-tab {
+  flex: 1; padding: 9px 4px; background: none; border: none;
+  border-bottom: 2px solid transparent; color: var(--ink4); cursor: pointer;
+  font-family: var(--font-display); font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  transition: color .2s, border-color .2s;
+}
+.opt-tab.active { color: var(--sage2); border-bottom-color: var(--sage2); }
+.opt-tab:hover:not(.active) { color: var(--ink2); }
+.opt-section { display: none; }
+.opt-section.active { display: block; animation: fadeUp .25s ease; }
+
 /* ── SECTION TITLES ──────────────────────────────────────────── */
 .sect {
   font-family: var(--font-display); font-size: 9px;
@@ -297,11 +310,12 @@ body {
   background: var(--parch); border: 1px solid var(--parch4);
   border-radius: var(--radius-lg); padding: 15px; box-shadow: var(--shadow);
 }
-.workout-title { font-family: var(--font-display); font-size: 13px; color: var(--ink); letter-spacing: .04em; margin-bottom: 2px; }
-.workout-sub   { font-size: 11px; color: var(--ink3); margin-bottom: 6px; }
-.workout-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.workout-header-left { flex: 1; }
-.diff-btns { display: flex; gap: 5px; align-items: center; padding-top: 2px; }
+.workout-title { font-family: var(--font-display); font-size: 14px; color: var(--ink); letter-spacing: .04em; margin-bottom: 3px; line-height: 1.25; }
+.workout-sub   { font-size: 11px; color: var(--ink3); margin-bottom: 3px; }
+.workout-meta  { font-size: 10px; color: var(--ink4); font-family: var(--font-mono); letter-spacing: .02em; margin-bottom: 8px; }
+.workout-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+.workout-header-left { flex: 1 1 58%; min-width: 150px; }
+.diff-btns { display: flex; gap: 5px; align-items: center; padding-top: 2px; flex-wrap: wrap; justify-content: flex-end; }
 .diff-btn {
   font-size: 10px; padding: 3px 8px; border-radius: 20px; border: 1px solid var(--parch4);
   background: var(--parch); color: var(--ink3); cursor: pointer; white-space: nowrap;
@@ -683,6 +697,46 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 .lvup-btn:hover:not(:disabled) { background: var(--gold); color: var(--parch); }
 .lvup-btn:disabled { opacity: .45; cursor: not-allowed; }
 
+/* ── EXERCISE DETAIL ("study") SHEET ─────────────────────────── */
+.exd-modal {
+  position: fixed; inset: 0; z-index: 620;
+  background: rgba(44,36,22,.80); backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; animation: fadeIn .25s ease;
+}
+.exd-modal.hidden { display: none; }
+.exd-card {
+  background: var(--parch); border: 2px solid var(--parch4);
+  border-radius: var(--radius-lg); padding: 18px;
+  max-width: 380px; width: 100%; max-height: 86vh; overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(44,36,22,.35);
+  animation: lvupIn .32s cubic-bezier(.175,.885,.32,1.275);
+}
+.exd-fancy { font-family: var(--font-display); font-size: 17px; color: var(--ink); line-height: 1.2; }
+.exd-plain { font-size: 12px; color: var(--ink3); margin-top: 2px; }
+.exd-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0; }
+.exd-chip {
+  font-size: 9px; font-family: var(--font-display); letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 7px; border-radius: 999px; background: var(--sage4); color: var(--sage2); border: 1px solid var(--sage3);
+}
+.exd-chip.muted { background: var(--parch2); color: var(--ink4); border-color: var(--parch4); }
+.exd-imgs { display: flex; gap: 6px; margin: 12px 0; }
+.exd-imgs img { width: 50%; border-radius: var(--radius); border: 1px solid var(--parch4); background: var(--parch2); aspect-ratio: 4/3; object-fit: cover; }
+.exd-steps { margin: 8px 0 0; padding-left: 20px; }
+.exd-steps li { font-size: 12px; color: var(--ink2); line-height: 1.6; margin-bottom: 6px; }
+.exd-note { font-size: 11px; color: var(--ink4); font-style: italic; font-family: var(--font-story); line-height: 1.5; }
+.exd-close {
+  width: 100%; margin-top: 16px; padding: 9px;
+  background: var(--parch3); border: 1px solid var(--parch4); border-radius: var(--radius);
+  color: var(--ink2); font-family: var(--font-display); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+}
+.exd-close:hover { background: var(--parch4); }
+.ex-info-btn {
+  background: none; border: none; cursor: pointer; color: var(--ink4);
+  font-size: 15px; line-height: 1; padding: 2px;
+}
+.ex-info-btn:hover { color: var(--sage2); }
+
 /* ── PASSPHRASE LOCK ─────────────────────────────────────────── */
 .lock-overlay {
   position: fixed; inset: 0; z-index: 10000;
@@ -969,6 +1023,11 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
   </div>
 </div>
 
+<!-- ── EXERCISE DETAIL ("study") SHEET ──────────────────────── -->
+<div class="exd-modal hidden" id="exd-modal" onclick="if(event.target===this)closeExerciseDetail()">
+  <div class="exd-card" id="exd-card" role="dialog" aria-modal="true" aria-label="Exercise details"></div>
+</div>
+
 <!-- ── SETUP WIZARD ─────────────────────────────────────────── -->
 <div class="wizard-overlay hidden" id="wizard">
   <div class="wizard-card" id="wizard-card"></div>
@@ -1138,225 +1197,249 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 <!-- SETTINGS TAB                                               -->
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="panel" id="settings">
-  <div class="sect">Notifications</div>
-  <div class="setting-group">
-    <div class="s-row">
-      <div>
-        <div class="s-lbl">Sounds</div>
-        <div class="s-sub">Ticks, chimes, and fanfares for checks and achievements.</div>
+  <div class="opt-tabs">
+    <button class="opt-tab active" id="opt-tab-workout"    onclick="optTab('workout',this)">Workout</button>
+    <button class="opt-tab"        id="opt-tab-narratives" onclick="optTab('narratives',this)">Narratives</button>
+    <button class="opt-tab"        id="opt-tab-settings"   onclick="optTab('settings',this)">Settings</button>
+  </div>
+
+  <!-- ══ WORKOUT ══ -->
+  <div class="opt-section active" id="opt-workout">
+    <div class="sect">Training Regime</div>
+    <div class="setting-group">
+      <div class="s-row"><div>
+        <div class="s-lbl">Training notes</div>
+        <div class="s-sub">Injuries, preferences, goals. Honored when the AI builds or regenerates sessions.</div>
+      </div></div>
+      <textarea class="s-input" id="cust-exercise" placeholder="e.g. bad left knee — avoid high impact, prefer HIIT, training for a 5k…"></textarea>
+
+      <div class="s-row" style="margin-top:10px"><div><div class="s-lbl">Experience level</div></div></div>
+      <div class="wizard-opt-group" id="s-exp-btns">
+        <button class="wizard-opt" data-val="beginner" onclick="sSet(this)">Beginner — new to exercise</button>
+        <button class="wizard-opt" data-val="some"     onclick="sSet(this)">Some experience — a few months in</button>
+        <button class="wizard-opt" data-val="regular"  onclick="sSet(this)">Regular — I train consistently</button>
       </div>
-      <button class="s-btn" id="sound-toggle-btn" onclick="toggleSound(this)" style="min-width:52px">On</button>
-    </div>
 
-    <div class="s-row" style="margin-top:14px">
-      <div>
-        <div class="s-lbl">Desktop reminders</div>
-        <div class="s-sub">Your hero will send a browser notification if you've been away too long.</div>
+      <div class="s-row" style="margin-top:10px"><div><div class="s-lbl">Session length</div></div></div>
+      <div class="wizard-opt-row" id="s-len-btns">
+        <button class="wizard-opt" data-val="15" onclick="sSet(this)">15 min</button>
+        <button class="wizard-opt" data-val="20" onclick="sSet(this)">20 min</button>
+        <button class="wizard-opt" data-val="30" onclick="sSet(this)">30 min</button>
+        <button class="wizard-opt" data-val="45" onclick="sSet(this)">45 min</button>
+        <button class="wizard-opt" data-val="60" onclick="sSet(this)">60 min</button>
       </div>
-    </div>
-    <div class="notif-st" id="notif-st"></div>
-    <button class="s-btn" id="notif-btn" onclick="reqNotif()">Enable notifications</button>
-  </div>
 
-  <div class="sect">Schedule</div>
-  <div class="setting-group">
-    <div class="s-row"><div>
-      <div class="s-lbl">Vacation mode</div>
-      <div class="s-sub">Pause streak and reminders until your return date.</div>
-    </div></div>
-    <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
-      <input class="s-input" type="date" id="pause-until-in" style="flex:1;min-width:0;margin-top:0"/>
-      <button class="s-btn" onclick="setPause()" style="margin-top:0;white-space:nowrap">Pause until</button>
-    </div>
-    <div class="notif-st" id="pause-st"></div>
-
-    <div class="s-row" style="margin-top:14px">
-      <div>
-        <div class="s-lbl">Rest day</div>
-        <div class="s-sub">Mark today as intentional rest — streak won't break.</div>
+      <div class="s-row" style="margin-top:10px"><div><div class="s-lbl">Days per week</div></div></div>
+      <div class="wizard-opt-row" id="s-days-btns">
+        <button class="wizard-opt" data-val="2" onclick="sSet(this)">2</button>
+        <button class="wizard-opt" data-val="3" onclick="sSet(this)">3</button>
+        <button class="wizard-opt" data-val="4" onclick="sSet(this)">4</button>
+        <button class="wizard-opt" data-val="5" onclick="sSet(this)">5</button>
       </div>
-      <button class="s-btn" id="offday-btn" onclick="markOffDay()" style="margin-top:0;white-space:nowrap">Mark today</button>
-    </div>
-    <div class="notif-st" id="offday-st"></div>
 
-    <div class="s-row" style="margin-top:14px"><div>
-      <div class="s-lbl">Reminder threshold</div>
-      <div class="s-sub">Nag after this many idle days.</div>
-    </div></div>
-    <div class="wizard-opt-row" id="nag-btns">
-      <button class="wizard-opt" data-n="2" onclick="saveNagFreq(2,this)">2 days</button>
-      <button class="wizard-opt" data-n="3" onclick="saveNagFreq(3,this)">3 days</button>
-      <button class="wizard-opt" data-n="5" onclick="saveNagFreq(5,this)">5 days</button>
-      <button class="wizard-opt" data-n="7" onclick="saveNagFreq(7,this)">1 week</button>
-    </div>
-  </div>
-
-  <div class="sect">Character</div>
-  <div class="setting-group">
-    <div class="char-identity" id="char-identity"></div>
-    <div style="font-size:10px;color:var(--ink4);margin-top:10px;line-height:1.6">Set during character creation.</div>
-    <button class="s-btn" onclick="runWizard()">Re-run setup wizard</button>
-  </div>
-
-  <div class="sect">Training Regime</div>
-  <div class="setting-group">
-    <div class="s-row"><div>
-      <div class="s-lbl">Training notes</div>
-      <div class="s-sub">Injuries, preferences, goals. Honored when the AI builds or regenerates sessions.</div>
-    </div></div>
-    <textarea class="s-input" id="cust-exercise" placeholder="e.g. bad left knee — avoid high impact, prefer HIIT, training for a 5k…"></textarea>
-
-    <div class="s-row" style="margin-top:10px"><div>
-      <div class="s-lbl">Experience level</div>
-    </div></div>
-    <div class="wizard-opt-group" id="s-exp-btns">
-      <button class="wizard-opt" data-val="beginner" onclick="sSet(this)">Beginner — new to exercise</button>
-      <button class="wizard-opt" data-val="some"     onclick="sSet(this)">Some experience — a few months in</button>
-      <button class="wizard-opt" data-val="regular"  onclick="sSet(this)">Regular — I train consistently</button>
-    </div>
-
-    <div class="s-row" style="margin-top:10px"><div>
-      <div class="s-lbl">Session length</div>
-    </div></div>
-    <div class="wizard-opt-row" id="s-len-btns">
-      <button class="wizard-opt" data-val="15" onclick="sSet(this)">15 min</button>
-      <button class="wizard-opt" data-val="20" onclick="sSet(this)">20 min</button>
-      <button class="wizard-opt" data-val="30" onclick="sSet(this)">30 min</button>
-      <button class="wizard-opt" data-val="45" onclick="sSet(this)">45 min</button>
-    </div>
-
-    <div class="s-row" style="margin-top:10px"><div>
-      <div class="s-lbl">Days per week</div>
-    </div></div>
-    <div class="wizard-opt-row" id="s-days-btns">
-      <button class="wizard-opt" data-val="2" onclick="sSet(this)">2</button>
-      <button class="wizard-opt" data-val="3" onclick="sSet(this)">3</button>
-      <button class="wizard-opt" data-val="4" onclick="sSet(this)">4</button>
-      <button class="wizard-opt" data-val="5" onclick="sSet(this)">5</button>
-    </div>
-
-    <div class="s-row" style="margin-top:10px"><div>
-      <div class="s-lbl">Equipment</div>
-    </div></div>
-    <div class="wizard-opt-group" id="s-equip-btns">
-      <button class="wizard-opt" data-val="bands"      onclick="sToggleEquip(this)">Resistance bands</button>
-      <button class="wizard-opt" data-val="dumbbells"  onclick="sToggleEquip(this)">Dumbbells</button>
-      <button class="wizard-opt" data-val="kettlebells" onclick="sToggleEquip(this)">Kettlebells</button>
-      <button class="wizard-opt" data-val="gym"        onclick="sToggleEquip(this)">Full gym</button>
-    </div>
-    <div style="font-size:10px;color:var(--ink4);margin-top:4px;margin-bottom:6px">Nothing selected = bodyweight only</div>
-
-    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-      <button class="s-btn" onclick="saveCustomizations()">Save notes</button>
-      <button class="s-btn" id="regen-btn" onclick="regenerateRegime()" style="background:var(--dusk4);border-color:var(--dusk3);color:var(--dusk2)">Regenerate Regime</button>
-    </div>
-    <div style="font-size:10px;color:var(--ink4);margin-top:10px;line-height:1.6">⚠ AI-generated sessions may contain errors. Treat all exercises as suggestions — not medical advice. Consult a qualified professional before starting a new programme or if you have any health conditions or injuries.</div>
-  </div>
-
-  <div class="sect">Customization</div>
-  <div class="setting-group" id="cust-group">
-    <div class="s-row"><div>
-      <div class="s-lbl">World vibe</div>
-      <div class="s-sub">Fine-tune the visual and narrative aesthetic beyond the genre preset.</div>
-    </div></div>
-    <textarea class="s-input" id="cust-vibe" placeholder="e.g. darker tone, more gothic, add steampunk elements…"></textarea>
-    <div class="s-row" style="margin-top:10px"><div>
-      <div class="s-lbl">Kat's personality</div>
-      <div class="s-sub">How your hero speaks in the story.</div>
-    </div></div>
-    <textarea class="s-input" id="cust-personality" placeholder="e.g. brutally honest, speak like a ship captain, more tough love…"></textarea>
-    <div id="cust-arc-note" class="s-sub" style="display:none;margin-top:8px;font-style:italic">
-      Changes saved — these will take effect at the start of the next arc.
-    </div>
-    <button class="s-btn" style="margin-top:10px" onclick="saveCustomizations()">Save</button>
-  </div>
-
-  <div class="sect">Appearance</div>
-  <div class="setting-group">
-    <div class="s-row">
-      <div>
-        <div class="s-lbl">Dark mode</div>
-        <div class="s-sub">Switch to a dark interface. Works across all genres.</div>
+      <div class="s-row" style="margin-top:10px"><div><div class="s-lbl">Equipment</div></div></div>
+      <div class="wizard-opt-group" id="s-equip-btns">
+        <button class="wizard-opt" data-val="bands"       onclick="sToggleEquip(this)">Resistance bands</button>
+        <button class="wizard-opt" data-val="dumbbells"   onclick="sToggleEquip(this)">Dumbbells</button>
+        <button class="wizard-opt" data-val="kettlebells" onclick="sToggleEquip(this)">Kettlebells</button>
+        <button class="wizard-opt" data-val="barbell"     onclick="sToggleEquip(this)">Barbell</button>
+        <button class="wizard-opt" data-val="cable"       onclick="sToggleEquip(this)">Cable machine</button>
+        <button class="wizard-opt" data-val="machine"     onclick="sToggleEquip(this)">Weight machines</button>
       </div>
-      <button class="s-btn" id="dark-mode-btn" onclick="toggleDarkMode()" style="min-width:52px"></button>
+      <div style="font-size:10px;color:var(--ink4);margin-top:4px;margin-bottom:6px">Tick only what you actually have. Nothing ticked = bodyweight only.</div>
+
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <button class="s-btn" onclick="saveCustomizations()">Save notes</button>
+        <button class="s-btn" id="regen-btn" onclick="regenerateRegime()" style="background:var(--dusk4);border-color:var(--dusk3);color:var(--dusk2)">Regenerate Regime</button>
+      </div>
+      <div style="font-size:10px;color:var(--ink4);margin-top:10px;line-height:1.6">⚠ AI-generated sessions may contain errors. Treat all exercises as suggestions — not medical advice. Consult a qualified professional before starting a new programme or if you have any health conditions or injuries.</div>
+    </div>
+
+    <div class="sect">Schedule</div>
+    <div class="setting-group">
+      <div class="s-row"><div>
+        <div class="s-lbl">Vacation mode</div>
+        <div class="s-sub">Pause streak and reminders until your return date.</div>
+      </div></div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+        <input class="s-input" type="date" id="pause-until-in" style="flex:1;min-width:0;margin-top:0"/>
+        <button class="s-btn" onclick="setPause()" style="margin-top:0;white-space:nowrap">Pause until</button>
+      </div>
+      <div class="notif-st" id="pause-st"></div>
+
+      <div class="s-row" style="margin-top:14px">
+        <div>
+          <div class="s-lbl">Rest day</div>
+          <div class="s-sub">Mark today as intentional rest — streak won't break.</div>
+        </div>
+        <button class="s-btn" id="offday-btn" onclick="markOffDay()" style="margin-top:0;white-space:nowrap">Mark today</button>
+      </div>
+      <div class="notif-st" id="offday-st"></div>
+
+      <div class="s-row" style="margin-top:14px"><div>
+        <div class="s-lbl">Reminder threshold</div>
+        <div class="s-sub">Nag after this many idle days.</div>
+      </div></div>
+      <div class="wizard-opt-row" id="nag-btns">
+        <button class="wizard-opt" data-n="2" onclick="saveNagFreq(2,this)">2 days</button>
+        <button class="wizard-opt" data-n="3" onclick="saveNagFreq(3,this)">3 days</button>
+        <button class="wizard-opt" data-n="5" onclick="saveNagFreq(5,this)">5 days</button>
+        <button class="wizard-opt" data-n="7" onclick="saveNagFreq(7,this)">1 week</button>
+      </div>
     </div>
   </div>
 
-  <div class="sect">API</div>
-  <div class="setting-group">
-    <div class="s-row">
-      <div>
-        <div class="s-lbl">Provider</div>
-        <div class="s-sub">Which AI service powers Kat's narrative and your sessions.</div>
+  <!-- ══ NARRATIVES ══ -->
+  <div class="opt-section" id="opt-narratives">
+    <div class="sect">Your Narratives</div>
+    <div class="setting-group">
+      <div class="s-sub">Run more than one story at once. Each starts at Level 1 with its own hero, chapters and loot — but your workouts, streak and progress carry across all of them.</div>
+      <div class="saves-list" id="narr-list"></div>
+      <div id="narr-new-form" style="display:none;margin-top:8px">
+        <div class="wizard-opt-row" id="narr-genre-row"></div>
+        <div class="wizard-opt-row" id="narr-tone-row" style="margin-top:5px"></div>
+        <input class="s-input" id="narr-name" placeholder="Hero name (optional)" style="margin-top:6px"/>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="s-btn" onclick="submitNewNarrative()">Create</button>
+          <button class="s-btn" onclick="toggleNewNarrative(false)">Cancel</button>
+        </div>
       </div>
+      <button class="s-btn" id="narr-new-btn" onclick="toggleNewNarrative(true)" style="margin-top:8px">✦ New narrative</button>
     </div>
-    <div class="provider-toggle">
-      <button class="prov-btn active" id="prov-anthropic" onclick="setProvider('anthropic',this)">Anthropic</button>
-      <button class="prov-btn"        id="prov-openai"    onclick="setProvider('openai',this)">OpenAI</button>
-    </div>
-    <div class="s-row" style="margin-top:4px">
-      <div>
-        <div class="s-lbl">API key</div>
-        <div class="s-sub">Stored only in your browser — never sent anywhere except your chosen provider.</div>
-      </div>
-    </div>
-    <input class="s-input" type="password" id="api-key-in" placeholder="sk-ant-… or sk-…"/>
-    <button class="s-btn" onclick="saveApiKey()" style="margin-right:6px">Save key</button>
-    <button class="s-btn" id="test-key-btn" onclick="testApiKey()" style="margin-right:6px;margin-top:0">Test key</button>
-    <button class="s-btn" onclick="runWizard()" style="margin-top:6px">Re-run setup wizard</button>
-    <button class="s-btn" onclick="replayTutorial()" style="margin-top:6px">Replay tutorial</button>
-  </div>
 
-  <div class="sect">Saved Stories</div>
-  <div class="setting-group">
-    <div class="s-sub">Save your current hero and story to return to later. Loading a save replaces your current progress.</div>
-    <button class="s-btn" onclick="saveStory()">Save current story</button>
-    <div class="saves-list" id="saves-list"></div>
-  </div>
-
-  <div class="sect">Privacy</div>
-  <div class="setting-group">
-    <div class="s-row">
-      <div>
-        <div class="s-lbl">Passphrase lock</div>
-        <div class="s-sub">This device stays unlocked until you lock it again — useful if you're on a shared or public computer.</div>
-      </div>
-      <button class="s-btn" onclick="lockNow()">Lock now</button>
+    <div class="sect">Character</div>
+    <div class="setting-group">
+      <div class="char-identity" id="char-identity"></div>
+      <div style="font-size:10px;color:var(--ink4);margin-top:10px;line-height:1.6">Set during character creation.</div>
+      <button class="s-btn" onclick="runWizard()">Re-run setup wizard</button>
     </div>
-  </div>
 
-  <div class="sect">Data</div>
-  <div class="setting-group">
-    <div class="s-row"><div>
-      <div class="s-lbl">Export / Import</div>
-      <div class="s-sub">Download your hero, story, and progress as a JSON file, or restore from a previous export.</div>
-    </div></div>
-    <button class="s-btn" onclick="exportData()" style="margin-right:6px">Export data</button>
-    <label class="s-btn" style="cursor:pointer;display:inline-block;margin-top:0">Import data<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
-    <div class="s-row" style="margin-top:14px">
-      <div>
-        <div class="s-lbl">Reset all progress</div>
-        <div class="s-sub">Wipes XP, sessions, streaks. Keeps your API key and custom workouts.</div>
+    <div class="sect">Story Customization</div>
+    <div class="setting-group" id="cust-group">
+      <div class="s-row"><div>
+        <div class="s-lbl">World vibe</div>
+        <div class="s-sub">Fine-tune the visual and narrative aesthetic beyond the genre preset.</div>
+      </div></div>
+      <textarea class="s-input" id="cust-vibe" placeholder="e.g. darker tone, more gothic, add steampunk elements…"></textarea>
+      <div class="s-row" style="margin-top:10px"><div>
+        <div class="s-lbl">Hero's personality</div>
+        <div class="s-sub">How your hero speaks in the story.</div>
+      </div></div>
+      <textarea class="s-input" id="cust-personality" placeholder="e.g. brutally honest, speak like a ship captain, more tough love…"></textarea>
+      <div id="cust-arc-note" class="s-sub" style="display:none;margin-top:8px;font-style:italic">
+        Changes saved — these will take effect at the start of the next arc.
       </div>
-      <button class="s-btn danger" onclick="doReset()">Reset</button>
+      <button class="s-btn" style="margin-top:10px" onclick="saveCustomizations()">Save</button>
+    </div>
+
+    <div class="sect">Saved Stories</div>
+    <div class="setting-group">
+      <div class="s-sub">Snapshot the current narrative to restore later. Loading a save replaces the active narrative.</div>
+      <button class="s-btn" onclick="saveStory()">Save current story</button>
+      <div class="saves-list" id="saves-list"></div>
     </div>
   </div>
 
-  <div class="sect">Developer / Testing</div>
-  <div class="setting-group">
-    <div class="s-row">
-      <div>
-        <div class="s-lbl">No daily limit</div>
-        <div class="s-sub">Allow completing sessions multiple times per day. Useful for testing XP and level-up flows.</div>
+  <!-- ══ SETTINGS ══ -->
+  <div class="opt-section" id="opt-settings">
+    <div class="sect">Notifications</div>
+    <div class="setting-group">
+      <div class="s-row">
+        <div>
+          <div class="s-lbl">Sounds</div>
+          <div class="s-sub">Ticks, chimes, and fanfares for checks and achievements.</div>
+        </div>
+        <button class="s-btn" id="sound-toggle-btn" onclick="toggleSound(this)" style="min-width:52px">On</button>
       </div>
-      <button class="s-btn" id="dev-no-limit-btn" onclick="toggleDevNoLimit()" style="min-width:52px"></button>
+      <div class="s-row" style="margin-top:14px">
+        <div>
+          <div class="s-lbl">Desktop reminders</div>
+          <div class="s-sub">Your hero will send a browser notification if you've been away too long.</div>
+        </div>
+      </div>
+      <div class="notif-st" id="notif-st"></div>
+      <button class="s-btn" id="notif-btn" onclick="reqNotif()">Enable notifications</button>
     </div>
-    <div class="s-row">
-      <div>
-        <div class="s-lbl">Wipe all data</div>
-        <div class="s-sub">Removes all progress, name, and custom sessions. Keeps your API key. Restarts setup.</div>
+
+    <div class="sect">Appearance</div>
+    <div class="setting-group">
+      <div class="s-row">
+        <div>
+          <div class="s-lbl">Dark mode</div>
+          <div class="s-sub">Switch to a dark interface. Works across all genres.</div>
+        </div>
+        <button class="s-btn" id="dark-mode-btn" onclick="toggleDarkMode()" style="min-width:52px"></button>
       </div>
-      <button class="s-btn danger" onclick="doWipeAll()">Wipe all</button>
+    </div>
+
+    <div class="sect">API</div>
+    <div class="setting-group">
+      <div class="s-row">
+        <div>
+          <div class="s-lbl">Provider</div>
+          <div class="s-sub">Which AI service powers the narrative and your sessions.</div>
+        </div>
+      </div>
+      <div class="provider-toggle">
+        <button class="prov-btn active" id="prov-anthropic" onclick="setProvider('anthropic',this)">Anthropic</button>
+        <button class="prov-btn"        id="prov-openai"    onclick="setProvider('openai',this)">OpenAI</button>
+      </div>
+      <div class="s-row" style="margin-top:4px">
+        <div>
+          <div class="s-lbl">API key</div>
+          <div class="s-sub">Stored only in your browser — never sent anywhere except your chosen provider.</div>
+        </div>
+      </div>
+      <input class="s-input" type="password" id="api-key-in" placeholder="sk-ant-… or sk-…"/>
+      <button class="s-btn" onclick="saveApiKey()" style="margin-right:6px">Save key</button>
+      <button class="s-btn" id="test-key-btn" onclick="testApiKey()" style="margin-right:6px;margin-top:0">Test key</button>
+      <button class="s-btn" onclick="replayTutorial()" style="margin-top:6px">Replay tutorial</button>
+    </div>
+
+    <div class="sect">Privacy</div>
+    <div class="setting-group">
+      <div class="s-row">
+        <div>
+          <div class="s-lbl">Passphrase lock</div>
+          <div class="s-sub">This device stays unlocked until you lock it again — useful if you're on a shared or public computer.</div>
+        </div>
+        <button class="s-btn" onclick="lockNow()">Lock now</button>
+      </div>
+    </div>
+
+    <div class="sect">Data</div>
+    <div class="setting-group">
+      <div class="s-row"><div>
+        <div class="s-lbl">Export / Import</div>
+        <div class="s-sub">Download your hero, story, and progress as a JSON file, or restore from a previous export.</div>
+      </div></div>
+      <button class="s-btn" onclick="exportData()" style="margin-right:6px">Export data</button>
+      <label class="s-btn" style="cursor:pointer;display:inline-block;margin-top:0">Import data<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+      <div class="s-row" style="margin-top:14px">
+        <div>
+          <div class="s-lbl">Reset all progress</div>
+          <div class="s-sub">Wipes XP, sessions, streaks. Keeps your API key and custom workouts.</div>
+        </div>
+        <button class="s-btn danger" onclick="doReset()">Reset</button>
+      </div>
+    </div>
+
+    <div class="sect">Developer / Testing</div>
+    <div class="setting-group">
+      <div class="s-row">
+        <div>
+          <div class="s-lbl">No daily limit</div>
+          <div class="s-sub">Allow completing sessions multiple times per day. Useful for testing XP and level-up flows.</div>
+        </div>
+        <button class="s-btn" id="dev-no-limit-btn" onclick="toggleDevNoLimit()" style="min-width:52px"></button>
+      </div>
+      <div class="s-row">
+        <div>
+          <div class="s-lbl">Wipe all data</div>
+          <div class="s-sub">Removes all progress, name, and custom sessions. Keeps your API key. Restarts setup.</div>
+        </div>
+        <button class="s-btn danger" onclick="doWipeAll()">Wipe all</button>
+      </div>
     </div>
   </div>
 </div><!-- /settings -->
@@ -1366,7 +1449,7 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 <div class="diff-nudge hidden" id="diff-nudge">
   <div class="diff-nudge-msg">Adjusting a lot? Set workout notes in Options — equipment, injuries, and preferences — so the AI gets it right the first time.</div>
   <div class="diff-nudge-actions">
-    <button class="diff-nudge-btn" onclick="closeDiffNudge(); go('settings', document.querySelector('.nav-btn[onclick*=settings]'))">Open Options</button>
+    <button class="diff-nudge-btn" onclick="closeDiffNudge(); goOpt('workout')">Open Options</button>
     <button class="diff-nudge-dismiss" onclick="closeDiffNudge()">Got it</button>
   </div>
 </div>
@@ -1521,6 +1604,27 @@ const SESSIONS = [
     ]
   },
 ];
+
+// Attach exercise-DB ids to the hand-authored fallback exercises so the
+// exercise-detail ("study") view works for them too. Names with no clean DB
+// match are left without an exId (the view falls back to the stored how-to).
+(() => {
+  const map = {
+    'Bodyweight squat': 'Bodyweight_Squat',
+    'Push-up': 'Pushups',
+    'Full push-up': 'Pushups',
+    'Glute bridge': 'Butt_Lift_Bridge',
+    'Door row': 'Inverted_Row',
+    'Dead bug': 'Dead_Bug',
+    'Reverse lunge': 'Bodyweight_Walking_Lunge',
+    'Single-leg glute bridge': 'Single_Leg_Glute_Bridge',
+    'Superman hold': 'Superman',
+    'Side plank': 'Side_Bridge',
+    'Squat with pulse': 'Bodyweight_Squat',
+    'Plank': 'Plank',
+  };
+  for (const s of SESSIONS) for (const e of s.exercises) if (map[e.p]) e.exId = map[e.p];
+})();
 
 /* ════════════════════════════════════════════════════════════════
    DATA — loot, badges, titles, XP
@@ -1692,14 +1796,256 @@ const CLASSES = {
 // Each level costs TARGET_SPL sessions worth of XP at that level's baseXP rate,
 // keeping sessions-per-level roughly constant as the game scales.
 const TARGET_SPL = 5; // target sessions per level
+function levelBaseXP(lv) { return 75 + (Math.max(1, lv) - 1) * 10; }
 const XP_LVS = (() => {
   const arr = [0];
   for (let lv = 1; lv <= 20; lv++) {
-    const bxp = Math.round(75 + (lv - 1) * 10);
-    arr.push(arr[lv - 1] + TARGET_SPL * bxp);
+    arr.push(arr[lv - 1] + TARGET_SPL * levelBaseXP(lv));
   }
   return arr;
 })();
+
+/* Per-session XP: a completed session is worth ~one TARGET_SPL-th of a level,
+   independent of how many exercises or sets it contains. Scaled by how much of
+   the session was actually done, and a small bump for the "Push Yourself" slot. */
+function sessionXPFor(sessIndex, completionRatio) {
+  const roleMult = sessIndex === 2 ? 1.15 : 1;
+  return Math.max(0, Math.round(levelBaseXP(getLv()) * clamp01(completionRatio) * roleMult));
+}
+function clamp01(n) { return Math.min(1, Math.max(0, Number(n) || 0)); }
+function sessionCompletionRatio(sessIndex, sess) {
+  const checked = S.exerciseChecked || {};
+  const total = (sess.exercises || []).length || 1;
+  const done  = (sess.exercises || []).reduce((n, _, ei) => n + (checked[`${sessIndex}-${ei}`] ? 1 : 0), 0);
+  return done / total;
+}
+
+/* Honest workout-time estimate, computed from the actual prescribed volume
+   instead of the hardcoded "~20 min" string the generator copies verbatim.
+   One place defines seconds-per-set (work + rest) so the time estimate and the
+   generator's set budget always agree. Rest grows with experience because more
+   experienced trainees lift heavier and rest longer (ACSM: 1–2 min general,
+   2–3 min for heavier strength work). */
+const SESSION_OVERHEAD_SEC = 300;  // warm-up + transitions + cleanup
+function secondsPerSet() {
+  const exp = (S.prefs || {}).experience;
+  if (exp === 'regular') return 50 + 110; // heavier loads, longer rest
+  if (exp === 'some')    return 45 + 90;
+  return 40 + 75;                          // beginner: lighter, shorter rest
+}
+function parseSetCount(setsStr) {
+  const m = String(setsStr || '').match(/(\d+)\s*[×xX]/);
+  return m ? Math.max(1, parseInt(m[1], 10)) : 2;
+}
+function parseHoldSec(setsStr) {
+  // a timed hold like "2 × 30s" or "2 × 20s each side" or "3 × 30 sec"
+  const m = String(setsStr || '').match(/(\d+)\s*s(?:ec|econds?)?\b/i);
+  return m ? parseInt(m[1], 10) : 0;
+}
+function estimateSessionMinutes(exercises) {
+  const perSet = secondsPerSet();
+  const rest   = perSet - 40;               // rest portion, work handled below
+  let sec = SESSION_OVERHEAD_SEC;
+  for (const e of (exercises || [])) {
+    const sets = parseSetCount(e.sets);
+    const hold = parseHoldSec(e.sets);
+    let work = hold > 0 ? hold + 5 : 40;
+    if (/each side|each leg|per side|per leg/i.test(String(e.sets || ''))) work *= 2;
+    sec += sets * (work + rest);
+  }
+  return Math.max(5, Math.round(sec / 60));
+}
+// Replace a leading "~NN min ·" in a stored sub with the freshly computed estimate.
+function subWithHonestTime(sess) {
+  const mins = estimateSessionMinutes(sess.exercises);
+  const rest = sessionDescOnly(sess);
+  return rest ? `~${mins} min · ${rest}` : `~${mins} min`;
+}
+// Just the description part of a stored sub, with any leading "~NN min ·" removed.
+function sessionDescOnly(sess) {
+  return String(sess.sub || '').replace(/^\s*~?\s*\d+\s*min\s*(?:·|-|—)?\s*/i, '').trim();
+}
+// The working-set budget for a session, derived from the length the USER chose
+// (S.prefs.sessionLength). This is what the generator is told to stay under.
+function userSessionMinutes() { return Number((S.prefs || {}).sessionLength) || 20; }
+function targetSetBudget(mins) {
+  const m = Number(mins) || 20;
+  const mid = Math.max(4, (m * 60 - SESSION_OVERHEAD_SEC) / secondsPerSet());
+  return { mins: m, lo: Math.max(5, Math.round(mid * 0.85)), hi: Math.max(7, Math.round(mid * 1.15)) };
+}
+
+/* ════════════════════════════════════════════════════════════════
+   EXERCISE DATABASE  (yuhonas/free-exercise-db, trimmed — public domain)
+   Loaded lazily from ./exercises.json. Each record:
+   { id, name, level, eq, cat, mech, force, pm[], sm[], ins[], img[] }
+   The generator picks ids from this; sets/reps/rest come from PROGRESSION_RULES.
+════════════════════════════════════════════════════════════════ */
+let _exDB = null, _exById = null, _exDBLoading = null;
+function loadExerciseDB() {
+  if (_exDB) return Promise.resolve(_exDB);
+  if (_exDBLoading) return _exDBLoading;
+  _exDBLoading = fetch('./exercises.json')
+    .then(r => { if (!r.ok) throw new Error('exercises.json ' + r.status); return r.json(); })
+    .then(list => {
+      _exDB = list;
+      _exById = Object.create(null);
+      for (const e of list) _exById[e.id] = e;
+      return _exDB;
+    })
+    .catch(err => { _exDBLoading = null; throw err; });
+  return _exDBLoading;
+}
+function exById(id) { return _exById ? _exById[id] : null; }
+
+// yuhonas image paths are relative to the repo's exercises/ dir; serve from jsDelivr.
+const EX_IMG_BASE = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/';
+function exImageUrls(e) { return (e && e.img || []).map(p => EX_IMG_BASE + p); }
+
+// Map the app's equipment prefs to the DB's eq buckets. Bodyweight is always in.
+const _EQ_BUCKETS = new Set(['bands', 'dumbbells', 'kettlebells', 'barbell', 'cable', 'machine']);
+function allowedEquipment(prefsEquip) {
+  const set = new Set(['bodyweight']);
+  for (const e of (prefsEquip || [])) {
+    if (e === 'gym') ['barbell', 'cable', 'machine', 'dumbbells', 'kettlebells'].forEach(x => set.add(x));
+    else if (_EQ_BUCKETS.has(e)) set.add(e);
+  }
+  return set;
+}
+function levelRank(l) { return l === 'expert' ? 3 : l === 'intermediate' ? 2 : 1; }
+function expLevelCeil(exp) { return exp === 'regular' ? 'expert' : exp === 'some' ? 'intermediate' : 'beginner'; }
+
+// Filter the DB for a session slot.
+function filterExercises({ equipment, maxLevel = 'intermediate', muscles = null, category = null } = {}) {
+  if (!_exDB) return [];
+  const eqSet = equipment instanceof Set ? equipment : allowedEquipment(equipment);
+  const lvlCeil = levelRank(maxLevel);
+  const muSet = muscles ? new Set(muscles) : null;
+  return _exDB.filter(e =>
+    eqSet.has(e.eq) &&
+    levelRank(e.level) <= lvlCeil &&
+    (!category || e.cat === category) &&
+    (!muSet || e.pm.some(m => muSet.has(m)))
+  );
+}
+
+// Coarse movement-pattern → primary-muscle groups, for building balanced sessions.
+const MOVEMENT_PATTERNS = {
+  'squat':        ['quadriceps', 'glutes'],
+  'hinge':        ['hamstrings', 'glutes', 'lower back'],
+  'lunge':        ['quadriceps', 'glutes', 'hamstrings'],
+  'horiz push':   ['chest', 'triceps', 'shoulders'],
+  'vert push':    ['shoulders', 'triceps'],
+  'horiz pull':   ['middle back', 'lats', 'biceps'],
+  'vert pull':    ['lats', 'biceps', 'middle back'],
+  'core':         ['abdominals', 'lower back'],
+  'calf':         ['calves'],
+};
+
+/* Set / rep / rest defaults by goal × experience (ACSM position stand, 2009 +
+   2026 update). `rep` is a [low, high] range for double progression; `rest` in
+   seconds. No goal pref yet — default 'hypertrophy' (general fitness). */
+const PROGRESSION_RULES = {
+  strength:    { beginner: { sets: 2, rep: [6, 8],   rest: 120 }, some: { sets: 3, rep: [5, 8],   rest: 150 }, regular: { sets: 3, rep: [4, 6],   rest: 180 } },
+  hypertrophy: { beginner: { sets: 2, rep: [8, 12],  rest: 75  }, some: { sets: 3, rep: [8, 12],  rest: 90  }, regular: { sets: 3, rep: [8, 12],  rest: 90  } },
+  endurance:   { beginner: { sets: 2, rep: [12, 18], rest: 45  }, some: { sets: 2, rep: [15, 20], rest: 45  }, regular: { sets: 3, rep: [15, 20], rest: 45  } },
+};
+function progressionRule(goal, exp) {
+  const g = PROGRESSION_RULES[goal] || PROGRESSION_RULES.hypertrophy;
+  return g[exp === 'regular' ? 'regular' : exp === 'some' ? 'some' : 'beginner'];
+}
+// "2 × 10" style string from a rule + optional timed hold.
+function setsStringFromRule(rule, isTimed) {
+  if (isTimed) return `${rule.sets} × ${Math.max(15, rule.rep[0] * 3)}s`;
+  return `${rule.sets} × ${rule.rep[0]}–${rule.rep[1]}`;
+}
+
+// Thrown when the exercise DB can't be fetched. Callers surface it as a toast.
+const EX_DB_ERROR = "Couldn't load the exercise library — are you online? Check your Wi-Fi and try again.";
+
+function _exPattern(e) {
+  for (const [pat, muscles] of Object.entries(MOVEMENT_PATTERNS)) {
+    if (e.pm.some(m => muscles.includes(m))) return pat;
+  }
+  return 'other';
+}
+function _shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+function _exKind(e) {
+  if (e.cat === 'stretching') return 'stretch';
+  if (e.cat === 'cardio' || e.cat === 'plyometrics') return 'plyo';
+  return 'strength';
+}
+/* Build the menu of real exercises the generator must choose from, filtered to
+   the user's equipment + experience ceiling and spread across movement patterns.
+   Mostly resistance work, plus a small tail of mobility/stretch and plyometric
+   moves (marked) so mobility days and conditioning are still possible.
+   Loads the DB (throws EX_DB_ERROR on failure). */
+async function buildExerciseMenu(prefs, { perPattern = 9, cap = 64 } = {}) {
+  try { await loadExerciseDB(); }
+  catch (_) { throw new Error(EX_DB_ERROR); }
+  const eqSet = allowedEquipment(prefs.equipment);
+  const all   = filterExercises({ equipment: eqSet, maxLevel: expLevelCeil(prefs.experience) });
+  const main  = all.filter(e => _exKind(e) === 'strength');
+  const aux   = all.filter(e => _exKind(e) !== 'strength');
+  if (!main.length) throw new Error(EX_DB_ERROR);
+
+  const spread = (list, per) => {
+    const groups = {};
+    for (const e of list) (groups[_exPattern(e)] = groups[_exPattern(e)] || []).push(e);
+    const out = [];
+    for (const pat of Object.keys(groups)) {
+      const g = _shuffle(groups[pat].slice());
+      g.sort((a, b) => (a.mech === 'compound' ? -1 : 1) - (b.mech === 'compound' ? -1 : 1)); // compounds first
+      out.push(...g.slice(0, per));
+    }
+    return _shuffle(out);
+  };
+
+  const auxCap = Math.max(4, Math.round(cap * 0.18)); // ~18% of the menu at most
+  const menu = [
+    ...spread(main, perPattern).slice(0, cap - auxCap),
+    ...spread(aux, Math.max(2, Math.round(perPattern / 3))).slice(0, auxCap),
+  ];
+  const byId = new Map(menu.map(e => [e.id, e]));
+  const menuText = menu
+    .map(e => {
+      const tags = [_exPattern(e), e.eq];
+      if (e.mech === 'compound') tags.push('compound');
+      if (_exKind(e) !== 'strength') tags.push(_exKind(e));
+      return `${e.id} | ${e.name} | ${tags.join(' | ')}`;
+    })
+    .join('\n');
+  return { menuText, byId, count: menu.length };
+}
+
+/* Turn the AI's [{id,f,h?}] picks into full exercise objects. Plain name, how-to
+   and muscles come from the DB record; sets/reps/rest from PROGRESSION_RULES.
+   `harder` bumps volume for the "Push Yourself" slot. Unknown ids are dropped. */
+function hydrateChosenExercises(chosen, prefs, { goal = 'hypertrophy', harder = false, byId = null } = {}) {
+  // "harder" (the Push-Yourself slot) steps up one experience tier — more sets /
+  // tighter reps — but nothing beyond that, so it stays inside the time budget.
+  const base = prefs.experience || 'beginner';
+  const exp  = harder ? (base === 'beginner' ? 'some' : 'regular') : base;
+  const rule = progressionRule(goal, exp);
+  const out = [];
+  for (const c of (Array.isArray(chosen) ? chosen : [])) {
+    if (!c) continue;
+    const id  = typeof c === 'string' ? c : c.id;
+    const rec = exById(id) || (byId && byId.get(id));
+    if (!rec) continue;
+    const isTimed = rec.force === 'static' || rec.cat === 'stretching';
+    out.push({
+      exId: rec.id,
+      f:    String((c && c.f) || rec.name),
+      p:    rec.name,
+      h:    String((c && c.h) || (rec.ins || []).slice(0, 2).join(' ') || ''),
+      sets: setsStringFromRule(rule, isTimed),
+      muscles: rec.pm.slice(),
+      xp:   15,
+    });
+  }
+  return out;
+}
 
 const LEVEL_LOOT_LV2_BY_CLASS = {
   fantasy: {
@@ -2033,7 +2379,8 @@ let curLootFilter = 'all';
    PERSISTENCE
 ════════════════════════════════════════════════════════════════ */
 function save() {
-  try { localStorage.setItem("kat_rpg_v3", JSON.stringify(S)); }
+  syncActiveNarrative();
+  try { localStorage.setItem("kat_rpg_v4", JSON.stringify(S)); }
   catch(e) {
     console.warn("KAT RPG: could not save state", e);
     toast('⚠ Progress could not be saved — browser storage may be full.');
@@ -2069,7 +2416,7 @@ function syncReminderState() {
 let _storyRepairedNote = null;
 function load() {
   try {
-    const d = localStorage.getItem("kat_rpg_v3");
+    const d = localStorage.getItem("kat_rpg_v4");
     if (d) S = { ...S, ...JSON.parse(d) };
     if (!S.companionCandidates) S.companionCandidates = [];
     if (!S.generatedCompanions) S.generatedCompanions = [];
@@ -2135,7 +2482,139 @@ function load() {
       S.storyChapterIdx     = Math.min(S.storyChapterIdx || 0, Math.max(0, S.storyChapters.length - 1));
       S.storyChaptersMaxIdx = Math.min(S.storyChaptersMaxIdx || 0, Math.max(0, S.storyChapters.length - 1));
     }
+    migrateNarratives();
   } catch(e) { console.warn("KAT RPG: could not load state", e); }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   NARRATIVES — switchable story "skins" over one shared training core.
+   S always holds the ACTIVE narrative's values merged with the core.
+   Switching swaps the skin fields; the core (streak, calendar, body
+   prefs, baselines, chronicle) stays put. Each narrative starts at Lv 1.
+════════════════════════════════════════════════════════════════ */
+// Skin fields — snapshotted per narrative. Everything else on S is shared core.
+const NARRATIVE_FIELDS = [
+  'name', 'level', 'totalXP', 'sessions',
+  'storyText', 'storyChapters', 'storyChapterIdx', 'storyChapterMaxIdx', 'storyChaptersMaxIdx',
+  'storySeeds', 'arcSummary', 'arcComplete', 'storyChapter', 'storyChaptersUnlocked',
+  'currentArcTitle', 'currentArcPremise',
+  'customSessions', 'levelLoot', 'earnedTitles',
+  'customLoot', 'customBadges', 'customLevelLoot', 'customReminders',
+  'loreNotes', 'companionsSeen', 'companionCandidates', 'generatedCompanions',
+  'completedToday', 'completedSessList', 'exerciseChecked', 'charFlags',
+];
+// prefs sub-keys that belong to the narrative skin (the rest of prefs is core).
+const NARRATIVE_PREFS = ['genre', 'tone', 'heroClass', 'vibeNote', 'personalityNote'];
+
+function _clone(v) { try { return JSON.parse(JSON.stringify(v)); } catch (_) { return v; } }
+
+function snapshotNarrativeData() {
+  const d = {};
+  for (const k of NARRATIVE_FIELDS) if (S[k] !== undefined) d[k] = _clone(S[k]);
+  d._prefs = {};
+  for (const k of NARRATIVE_PREFS) d._prefs[k] = (S.prefs || {})[k];
+  return d;
+}
+function applyNarrativeData(d) {
+  if (!d) return;
+  for (const k of NARRATIVE_FIELDS) if (d[k] !== undefined) S[k] = _clone(d[k]);
+  if (!S.prefs) S.prefs = {};
+  for (const k of NARRATIVE_PREFS) if (d._prefs && d._prefs[k] !== undefined) S.prefs[k] = d._prefs[k];
+}
+function activeNarrative() {
+  return (S.narratives || []).find(n => n.id === S.activeNarrativeId) || (S.narratives || [])[0] || null;
+}
+// Keep the active slot's stored data in sync with live S (called before every save).
+function syncActiveNarrative() {
+  const n = activeNarrative();
+  if (n) n.data = snapshotNarrativeData();
+}
+// One-time: wrap an existing flat save as narrative #1.
+function migrateNarratives() {
+  if (S.schema === undefined) S.schema = 1;
+  if (!Array.isArray(S.narratives) || !S.narratives.length) {
+    const id = 'n' + Date.now().toString(36);
+    S.narratives = [{
+      id,
+      label: ((S.prefs || {}).genre || 'Adventure').replace(/^\w/, c => c.toUpperCase()),
+      createdAt: Date.now(),
+      data: snapshotNarrativeData(),
+    }];
+    S.activeNarrativeId = id;
+  }
+  if (S.lifetimeSessions === undefined) S.lifetimeSessions = S.sessions || 0;
+  if (!S.chronicle) S.chronicle = { arcsCompleted: [], strengthMilestones: [] };
+  if (!S.charFlags) S.charFlags = [];
+  S.schema = 4;
+}
+
+function narrativeLabel(n) {
+  return (n && n.label) || 'Narrative';
+}
+
+// Switch to an existing narrative: stash the current skin, load the target's.
+function switchNarrative(id) {
+  if (id === S.activeNarrativeId) return;
+  const target = (S.narratives || []).find(n => n.id === id);
+  if (!target) return;
+  syncActiveNarrative();
+  S.activeNarrativeId = id;
+  applyNarrativeData(target.data);
+  applyGenreTheme((S.prefs || {}).genre);
+  applyDarkMode();
+  save();
+  renderAll();
+  toast('Now playing: ' + narrativeLabel(target));
+}
+
+// Create a fresh narrative (new Level 1). Shared core — baselines, streak,
+// body prefs — carries over untouched; only the story skin is new.
+async function createNarrative({ genre, tone, heroClass, name, label }) {
+  syncActiveNarrative();
+  const id = 'n' + Date.now().toString(36);
+
+  // reset skin to Level-1 defaults, keep everything else on S as-is
+  S.name = name || S.name;
+  S.level = 1; S.totalXP = 0; S.sessions = 0;
+  S.storyText = ''; S.storyChapters = []; S.storyChapterIdx = 0;
+  S.storyChaptersMaxIdx = 0; S.storyChaptersUnlocked = 0; S.storyChapter = 0;
+  S.storySeeds = null; S.arcSummary = ''; S.arcComplete = false;
+  S.currentArcTitle = ''; S.currentArcPremise = '';
+  S.customSessions = []; S.levelLoot = []; S.earnedTitles = [];
+  S.customLoot = []; S.customBadges = []; S.customLevelLoot = []; S.customReminders = [];
+  S.loreNotes = []; S.companionsSeen = []; S.companionCandidates = []; S.generatedCompanions = [];
+  S.completedToday = null; S.completedSessList = []; S.exerciseChecked = {};
+  S.charFlags = [];
+  if (!S.prefs) S.prefs = {};
+  if (genre) S.prefs.genre = genre;
+  if (tone) S.prefs.tone = tone;
+  if (heroClass) S.prefs.heroClass = heroClass;
+
+  S.narratives.push({ id, label: label || (genre || 'Adventure').replace(/^\w/, c => c.toUpperCase()), createdAt: Date.now(), data: snapshotNarrativeData() });
+  S.activeNarrativeId = id;
+  applyGenreTheme(S.prefs.genre);
+  applyDarkMode();
+  save();
+  renderAll();
+
+  if (getApiKey()) {
+    try { await generateSessions('fresh'); save(); renderAll(); } catch (_) {}
+    generateStory();
+  }
+}
+
+function deleteNarrative(id) {
+  if ((S.narratives || []).length <= 1) { toast('Keep at least one narrative.'); return; }
+  const wasActive = id === S.activeNarrativeId;
+  S.narratives = S.narratives.filter(n => n.id !== id);
+  if (wasActive) {
+    S.activeNarrativeId = S.narratives[0].id;
+    applyNarrativeData(S.narratives[0].data);
+    applyGenreTheme((S.prefs || {}).genre);
+    applyDarkMode();
+  }
+  save();
+  renderAll();
 }
 
 function heroName() { return S.name || 'Kat'; }
@@ -2451,6 +2930,7 @@ function renderAll() {
   populateCustomizationFields();
   renderDevToggles();
   renderAppearanceSettings();
+  renderNarratives();
   renderSaves();
 }
 
@@ -2535,6 +3015,54 @@ function renderStoryBtn() {
   btn.innerHTML = (hasNext ? '✦ &nbsp;Continue the story' : '✦ &nbsp;Generate the next chapter') + countNote;
 }
 
+/* ── Exercise detail ("study") sheet ───────────────────────── */
+function closeExerciseDetail() {
+  const m = document.getElementById('exd-modal');
+  if (m) m.classList.add('hidden');
+}
+async function openExerciseDetail(si, ei) {
+  const sess = getSessions()[si];
+  const ex = sess && sess.exercises[ei];
+  if (!ex) return;
+  const modal = document.getElementById('exd-modal');
+  const card  = document.getElementById('exd-card');
+  if (!modal || !card) return;
+
+  const header = `
+    <div class="exd-fancy">${escHtml(ex.f || ex.p)}</div>
+    <div class="exd-plain">${escHtml(ex.p)}${ex.sets ? ` &nbsp;·&nbsp; <span style="font-family:var(--font-mono)">${escHtml(ex.sets)}</span>` : ''}</div>`;
+  card.innerHTML = header + `<div class="exd-note" style="margin-top:12px">Loading guide…</div>
+    <button class="exd-close" onclick="closeExerciseDetail()">Close</button>`;
+  modal.classList.remove('hidden');
+
+  let rec = null;
+  if (ex.exId) { try { await loadExerciseDB(); rec = exById(ex.exId); } catch (_) {} }
+
+  let body;
+  if (rec) {
+    const chips = []
+      .concat((rec.pm || []).map(m => `<span class="exd-chip">${escHtml(m)}</span>`))
+      .concat((rec.sm || []).map(m => `<span class="exd-chip muted">${escHtml(m)}</span>`))
+      .concat(rec.eq && rec.eq !== 'bodyweight' ? [`<span class="exd-chip muted">${escHtml(rec.eq)}</span>`] : [])
+      .concat(rec.mech ? [`<span class="exd-chip muted">${escHtml(rec.mech)}</span>`] : [])
+      .concat(rec.force ? [`<span class="exd-chip muted">${escHtml(rec.force)}</span>`] : [])
+      .join('');
+    const imgs = exImageUrls(rec).slice(0, 2)
+      .map(u => `<img src="${u}" alt="" loading="lazy" onerror="this.style.display='none'">`).join('');
+    const steps = (rec.ins || []).map(s => `<li>${escHtml(s)}</li>`).join('');
+    body = `
+      <div class="exd-chips">${chips}</div>
+      ${imgs ? `<div class="exd-imgs">${imgs}</div>` : ''}
+      ${steps ? `<ol class="exd-steps">${steps}</ol>` : ''}
+      <div class="exd-note" style="margin-top:12px">Reference: Free Exercise DB (public domain).</div>`;
+  } else {
+    body = `
+      ${ex.h ? `<p class="exd-note" style="margin-top:12px;font-style:normal;color:var(--ink2);font-family:inherit;font-size:12px">${escHtml(withName(ex.h))}</p>` : ''}
+      <div class="exd-note" style="margin-top:12px">No detailed guide is available for this exercise.</div>`;
+  }
+  card.innerHTML = header + body + `<button class="exd-close" onclick="closeExerciseDetail()">Close</button>`;
+}
+
 /* ── Train tab ──────────────────────────────────────────────── */
 let curSess = 0;
 
@@ -2587,25 +3115,23 @@ function toggleCheck(si, ei) {
   const checked = S.exerciseChecked[key] = !S.exerciseChecked[key];
   if (checked) playSound('tick');
 
-  // Grant or revoke this exercise's XP immediately
-  const ex = getSessions()[si]?.exercises[ei];
-  if (ex && typeof ex.xp === 'number') {
-    S.totalXP = Math.max(0, S.totalXP + (checked ? ex.xp : -ex.xp));
-  }
-
   save();
 
-  // Update XP bar without touching level badge (level resolves at session completion)
+  // XP is awarded once at session completion (per-session, not per-exercise).
+  // Here we just preview the projected gain on the bar; level resolves on complete.
+  const sess = getSessions()[si];
+  const projected = sess ? sessionXPFor(si, sessionCompletionRatio(si, sess)) : 0;
   const lv = getLv();
   const prevXP = XP_LVS[Math.max(0, lv - 1)] || 0;
   const nextXP = XP_LVS[Math.min(lv, XP_LVS.length - 1)] || 9999;
-  const pct    = nextXP > prevXP ? Math.round(((S.totalXP - prevXP) / (nextXP - prevXP)) * 100) : 100;
+  const shown  = S.totalXP + projected;
+  const pct    = nextXP > prevXP ? Math.round(((shown - prevXP) / (nextXP - prevXP)) * 100) : 100;
   const fill = document.getElementById('xp-fill');
   const cur  = document.getElementById('xp-cur');
   const nxt  = document.getElementById('xp-nxt');
   if (fill) fill.style.width = Math.min(100, Math.max(0, pct)) + '%';
-  if (cur)  cur.textContent  = S.totalXP + ' XP';
-  if (nxt)  nxt.textContent  = nextXP > S.totalXP ? (nextXP - S.totalXP) + ' to Lv ' + (lv + 1) : 'Max level';
+  if (cur)  cur.textContent  = shown + ' XP' + (projected ? ' (+' + projected + ' pending)' : '');
+  if (nxt)  nxt.textContent  = nextXP > shown ? (nextXP - shown) + ' to Lv ' + (lv + 1) : 'Level up ready';
 
   const item = document.getElementById(`ex-item-${si}-${ei}`);
   if (item) {
@@ -2725,53 +3251,67 @@ function normalizeGeneratedExercises(list) {
 }
 
 // Generates label/sub/exercises for ONE session from a free-text description.
+// Exercises are chosen from the real exercise DB — the AI only picks ids + names.
 async function generateSessionPlan(dayName, description) {
-  const equipment  = ((S.prefs || {}).equipment || []).join(', ') || 'bodyweight only';
-  const experience = (S.prefs || {}).experience || 'beginner';
-  const userMsg = `Design one workout session for a fitness app.
-Day focus: "${dayName || 'Workout'}"${description ? ` — user's notes: "${description}"` : ''}
-Available equipment: ${equipment}
-Experience level: ${experience}
-Genre theme for exercise names: ${exerciseNameStyle()}
+  const prefs = S.prefs || {};
+  const experience = prefs.experience || 'beginner';
+  const { menuText, byId } = await buildExerciseMenu(prefs, { cap: 70 });
 
-Choose 4 to 7 exercises appropriate to the focus, equipment, and experience level.
+  const userMsg = `Build ONE workout session for a fitness app.
+Day focus: "${dayName || 'Workout'}"${description ? ` — user's notes: "${description}"` : ''}
+Experience level: ${experience}
+Genre theme for the thematic names: ${exerciseNameStyle()}
+
+Choose 4 to 6 exercises for this session ONLY from the menu below (use the exact id).
+Fit the focus and cover complementary movement patterns; prefer compound lifts.
+Menu items tagged "stretch" or "plyo" are available — use them when the focus calls for mobility, conditioning, or plyometric/athletic work; otherwise prefer strength movements.
+Do NOT invent exercises, sets, reps, or rest — the app fills those in.
+MENU (id | name | pattern | equipment | tags):
+${menuText}
 
 Return a single raw JSON object, no markdown fences, no extra text:
-{"label":"short session title, e.g. 'Leg Day — Lower Power'","sub":"~20 min · one-line description","exercises":[{"f":"thematic exercise name","p":"plain exercise name","h":"one sentence how-to / form cue","sets":"e.g. 3 × 12","xp":15}]}`;
+{"label":"short session title, e.g. 'Leg Day — Lower Power'","sub":"one-line description (no time estimate)","exercises":[{"id":"exact id from the menu","f":"thematic ${exerciseNameStyle()} name for this exercise"}]}`;
 
-  const raw = await callApi([{ role: 'user', content: userMsg }], { maxTokens: 1800 });
+  const raw = await callApi([{ role: 'user', content: userMsg }], { maxTokens: 1400 });
   const parsed = parseJsonLoose(raw, 'object');
   if (!parsed || !Array.isArray(parsed.exercises) || !parsed.exercises.length) {
     throw new Error('Could not parse the generated workout — try again.');
   }
-  return { label: parsed.label, sub: parsed.sub, exercises: normalizeGeneratedExercises(parsed.exercises) };
+  const exercises = hydrateChosenExercises(parsed.exercises, prefs, { byId });
+  if (!exercises.length) throw new Error('The generated workout had no usable exercises — try again.');
+  return { label: parsed.label, sub: parsed.sub, exercises };
 }
 
 // Generates a full multi-day plan (an array of sessions) from a free-text description.
+// Exercises are chosen from the real exercise DB — the AI only picks ids + names.
 async function generateMultiDayPlan(description, days) {
-  const equipment  = ((S.prefs || {}).equipment || []).join(', ') || 'bodyweight only';
-  const experience = (S.prefs || {}).experience || 'beginner';
-  const userMsg = `Design a ${days}-day workout plan for a fitness app, based on this request: "${description}"
-Available equipment: ${equipment}
-Experience level: ${experience}
-Genre theme for exercise names: ${exerciseNameStyle()}
+  const prefs = S.prefs || {};
+  const experience = prefs.experience || 'beginner';
+  const { menuText, byId } = await buildExerciseMenu(prefs, { perPattern: 11, cap: 90 });
 
-Each day should have a distinct focus (e.g. legs, push, pull, core, or a no-equipment/home day if requested) with 4 to 7 exercises appropriate to that focus, the available equipment, and the experience level.
+  const userMsg = `Build a ${days}-day workout plan for a fitness app, based on this request: "${description}"
+Experience level: ${experience}
+Genre theme for the thematic names: ${exerciseNameStyle()}
+
+Each day has a distinct focus (e.g. legs, push, pull, core, full-body, mobility, conditioning). Choose 4 to 6 exercises per day ONLY from the menu below (use the exact id). Prefer compound lifts; give each day complementary patterns; don't repeat the same id across days unless it makes sense.
+Menu items tagged "stretch" or "plyo" are available — use them for mobility or conditioning days, or as a warm-up/cool-down piece; otherwise prefer strength movements.
+Do NOT invent exercises, sets, reps, or rest — the app fills those in.
+MENU (id | name | pattern | equipment | tags):
+${menuText}
 
 Return a single raw JSON array of exactly ${days} day objects, no markdown fences, no extra text:
-[{"tag":"short day name, e.g. 'Leg Day'","label":"session title","sub":"~20 min · one-line description","exercises":[{"f":"thematic exercise name","p":"plain exercise name","h":"one sentence how-to/form cue","sets":"e.g. 3 × 12","xp":15}]}]`;
+[{"tag":"short day name, e.g. 'Leg Day'","label":"session title","sub":"one-line description (no time estimate)","exercises":[{"id":"exact id from the menu","f":"thematic ${exerciseNameStyle()} name"}]}]`;
 
-  const raw = await callApi([{ role: 'user', content: userMsg }], { maxTokens: 5000 });
+  const raw = await callApi([{ role: 'user', content: userMsg }], { maxTokens: 4000 });
   const parsed = parseJsonLoose(raw, 'array');
   if (!Array.isArray(parsed) || !parsed.length) throw new Error('Could not parse the generated plan — try again.');
   return parsed.map(d => {
-    const exercises = normalizeGeneratedExercises(d.exercises);
+    const exercises = hydrateChosenExercises(d.exercises, prefs, { byId });
     return {
       tag:   String(d.tag || d.label || 'Day'),
       label: String(d.label || d.tag || 'Day'),
       sub:   String(d.sub || ''),
-      xp:    exercises.reduce((sum, e) => sum + (e.xp || 0), 0),
-      exercises,
+      exercises: exercises.length ? exercises : hydrateChosenExercises([...byId.keys()].slice(0, 4), prefs, { byId }),
     };
   });
 }
@@ -2881,7 +3421,6 @@ async function generateSessMeta(si) {
       sess.label = plan.label || sess.label;
       sess.sub   = plan.sub   || sess.sub;
       sess.exercises = plan.exercises;
-      sess.xp = plan.exercises.reduce((sum, e) => sum + (e.xp || 0), 0);
       if (!sess.tag) sess.tag = dayName || plan.label || 'Workout';
     }
     editingSessMeta = null;
@@ -3050,7 +3589,8 @@ function renderWorkoutCard() {
         </div>`
     : `
         <div class="workout-title">${escHtml(sess.label)}</div>
-        <div class="workout-sub">${escHtml(sess.sub)} &nbsp;·&nbsp; +${sess.xp} XP</div>`;
+        ${sessionDescOnly(sess) ? `<div class="workout-sub">${escHtml(sessionDescOnly(sess))}</div>` : ''}
+        <div class="workout-meta">~${estimateSessionMinutes(sess.exercises)} min &nbsp;·&nbsp; ~${sessionXPFor(curSess, 1)} XP</div>`;
   document.getElementById('workout-card').innerHTML = `
     <div class="workout-header">
       <div class="workout-header-left">${headerLeft}</div>
@@ -3090,14 +3630,16 @@ function renderWorkoutCard() {
           <button class="ex-check-btn" onclick="toggleCheck(${curSess},${i})" aria-label="${isChecked ? 'Uncheck' : 'Check'}">
             <i class="ti ti-${isChecked ? 'circle-check-filled' : 'circle'}"></i>
           </button>
-          <div class="ex-content">
+          <div class="ex-content" style="cursor:pointer" onclick="openExerciseDetail(${curSess},${i})" title="How to do this exercise">
             <div class="ex-fancy">${escHtml(e.f)}</div>
             <div class="ex-plain">${escHtml(e.p)}<span class="ex-how">${escHtml(withName(e.h))}</span></div>
           </div>
           <div class="ex-meta">
             <div class="ex-sets">${e.sets}</div>
-            <div class="ex-xp">+${e.xp} xp</div>
             <div style="display:flex;gap:2px">
+              <button class="ex-info-btn" onclick="openExerciseDetail(${curSess},${i})" title="How to do this exercise" aria-label="How to do this exercise">
+                <i class="ti ti-info-circle"></i>
+              </button>
               <button class="ex-edit-btn" onclick="editExercise(${curSess},${i})" title="Edit">
                 <i class="ti ti-pencil"></i>
               </button>
@@ -3146,7 +3688,7 @@ function renderWorkoutCard() {
 function renderStreakTab() {
   document.getElementById('cur-st').textContent  = S.curStreak;
   document.getElementById('best-st').textContent = S.bestStreak;
-  document.getElementById('tot-s2').textContent  = S.sessions;
+  document.getElementById('tot-s2').textContent  = S.lifetimeSessions || S.sessions;
   document.getElementById('tot-xp').textContent  = S.totalXP;
 
   const grid = document.getElementById('cal-grid');
@@ -3316,13 +3858,13 @@ async function completeSession(i) {
   const sess = sessions[i];
 
   const arcBefore = getAdv();
-  // Compute XP earned from exercise checks (already in S.totalXP — don't add again)
-  const checked   = S.exerciseChecked || {};
-  const xpEarned  = sess.exercises.reduce((sum, ex, ei) =>
-    sum + (checked[`${i}-${ei}`] ? (ex.xp || 0) : 0), 0);
-  // Level BEFORE this session's XP (so level-up modal fires correctly)
-  const prevLv = getLv(S.totalXP - xpEarned);
+  // Per-session XP: award once here, sized as a fraction of a level and scaled
+  // by how much of the session got done — independent of exercise/set count.
+  const prevLv    = getLv();
+  const xpEarned  = sessionXPFor(i, sessionCompletionRatio(i, sess));
+  S.totalXP      += xpEarned;
   S.sessions++;
+  S.lifetimeSessions = (S.lifetimeSessions || 0) + 1; // shared core — spans every narrative
 
   if (S.lastDate !== t) {
     S.curStreak  = (S.lastDate === yest) ? S.curStreak + 1 : 1;
@@ -3348,7 +3890,16 @@ async function completeSession(i) {
   editingExercise = null;
 
   const arcAfter = getAdv();
-  if (arcAfter.id !== arcBefore.id) S.arcComplete = true;
+  if (arcAfter.id !== arcBefore.id) {
+    S.arcComplete = true;
+    // chronicle: a permanent record that spans every narrative
+    if (!S.chronicle) S.chronicle = { arcsCompleted: [], strengthMilestones: [] };
+    S.chronicle.arcsCompleted.push({
+      narrative: narrativeLabel(activeNarrative()),
+      arc: S.currentArcTitle || arcBefore.id,
+      at: t,
+    });
+  }
 
   companionCheck();
   Object.keys(_quipCache).forEach(k => delete _quipCache[k]);
@@ -3366,7 +3917,7 @@ async function completeSession(i) {
 /* ════════════════════════════════════════════════════════════════
    SAVED STORIES
 ════════════════════════════════════════════════════════════════ */
-const SAVES_KEY = 'kat_rpg_story_saves';
+const SAVES_KEY = 'kat_rpg_story_saves_v4';
 
 function getSaves() {
   try { return JSON.parse(localStorage.getItem(SAVES_KEY) || '[]'); } catch { return []; }
@@ -3398,7 +3949,7 @@ function loadStory(id) {
   const slot = saves.find(s => s.id === id);
   if (!slot) return;
   if (!confirm(`Load "${slot.name}"? Your current progress will be replaced.`)) return;
-  localStorage.setItem('kat_rpg_v3', JSON.stringify(slot.snapshot));
+  localStorage.setItem('kat_rpg_v4', JSON.stringify(slot.snapshot));
   load();
   renderAll();
   toast('✦ Story loaded: ' + slot.name);
@@ -3411,6 +3962,68 @@ function deleteSave(id) {
   localStorage.setItem(SAVES_KEY, JSON.stringify(saves.filter(s => s.id !== id)));
   renderSaves();
   toast('Save deleted.');
+}
+
+const NARR_GENRES = [
+  { v: 'fantasy', label: 'Fantasy' },
+  { v: 'scifi',   label: 'Sci-fi' },
+  { v: 'mystery', label: 'Mystery' },
+  { v: 'cozy',    label: 'Cozy' },
+];
+const NARR_TONES = [
+  { v: 'humorous', label: 'Humorous' },
+  { v: 'dramatic', label: 'Dramatic' },
+  { v: 'gentle',   label: 'Gentle' },
+];
+let _narrNewSel = { genre: 'fantasy', tone: 'humorous' };
+
+function renderNarratives() {
+  const el = document.getElementById('narr-list');
+  if (!el) return;
+  const list = S.narratives || [];
+  el.innerHTML = list.map(n => {
+    const active = n.id === S.activeNarrativeId;
+    const d = active ? { level: S.level, sessions: S.sessions, genre: (S.prefs || {}).genre }
+                     : { level: (n.data || {}).level || 1, sessions: (n.data || {}).sessions || 0, genre: ((n.data || {})._prefs || {}).genre };
+    return `<div class="save-slot"${active ? ' style="border-color:var(--sage3)"' : ''}>
+      <div class="save-slot-info">
+        <div class="save-slot-name">${escHtml(narrativeLabel(n))}${active ? ' <span style="font-size:9px;color:var(--sage2)">● now playing</span>' : ''}</div>
+        <div class="save-slot-meta">Lv ${d.level} · ${d.sessions} sessions · ${escHtml(d.genre || '—')}</div>
+      </div>
+      <div class="save-slot-actions">
+        ${active ? '' : `<button class="s-btn" style="margin-top:0" onclick="switchNarrative('${n.id}')">Play</button>`}
+        ${list.length > 1 ? `<button class="s-btn danger" style="margin-top:0;padding:7px 9px" onclick="if(confirm('Delete this narrative? Its story and loot are lost. Your workouts and streak stay.'))deleteNarrative('${n.id}')">✕</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleNewNarrative(show) {
+  const form = document.getElementById('narr-new-form');
+  const btn  = document.getElementById('narr-new-btn');
+  if (!form || !btn) return;
+  form.style.display = show ? 'block' : 'none';
+  btn.style.display  = show ? 'none' : 'block';
+  if (show) {
+    _narrNewSel = { genre: (S.prefs || {}).genre || 'fantasy', tone: (S.prefs || {}).tone || 'humorous' };
+    const gr = document.getElementById('narr-genre-row');
+    const tr = document.getElementById('narr-tone-row');
+    gr.innerHTML = NARR_GENRES.map(g => `<button class="wizard-opt ${_narrNewSel.genre === g.v ? 'sel' : ''}" onclick="_narrPick('genre','${g.v}',this)">${g.label}</button>`).join('');
+    tr.innerHTML = NARR_TONES.map(t => `<button class="wizard-opt ${_narrNewSel.tone === t.v ? 'sel' : ''}" onclick="_narrPick('tone','${t.v}',this)">${t.label}</button>`).join('');
+    const nm = document.getElementById('narr-name'); if (nm) nm.value = '';
+  }
+}
+function _narrPick(field, val, btn) {
+  _narrNewSel[field] = val;
+  btn.parentElement.querySelectorAll('.wizard-opt').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+async function submitNewNarrative() {
+  const name = ((document.getElementById('narr-name') || {}).value || '').trim();
+  toggleNewNarrative(false);
+  toast('Weaving a new narrative…');
+  await createNarrative({ genre: _narrNewSel.genre, tone: _narrNewSel.tone, name });
+  renderNarratives();
 }
 
 function renderSaves() {
@@ -3479,6 +4092,8 @@ async function newChapter() {
   } catch(e) {
     if (spinner) spinner.textContent = e.message === 'NO_KEY'
       ? 'Add an API key in Settings to generate new sessions.'
+      : e.message === EX_DB_ERROR
+      ? EX_DB_ERROR
       : 'The oracle is unreachable. Try again.';
     if (contBtn) { contBtn.disabled = false; newBtn.disabled = false; }
   }
@@ -3808,7 +4423,7 @@ function doReset() {
 
 
 function exportData() {
-  const data = localStorage.getItem('kat_rpg_v3');
+  const data = localStorage.getItem('kat_rpg_v4');
   if (!data) { toast('Nothing to export.'); return; }
   const blob = new Blob([data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -3834,7 +4449,7 @@ function importData(e) {
         toast('Invalid save file.'); return;
       }
       if (!confirm('Replace your current progress with this save?')) return;
-      localStorage.setItem('kat_rpg_v3', ev.target.result);
+      localStorage.setItem('kat_rpg_v4', ev.target.result);
       load();
       renderAll();
       toast('Data imported.');
@@ -3854,7 +4469,7 @@ function toggleDevNoLimit() {
 }
 function doWipeAll() {
   if (!confirm('Wipe EVERYTHING? This removes your name, API key, all progress, and custom sessions. The setup wizard will restart.')) return;
-  localStorage.removeItem('kat_rpg_v3');
+  localStorage.removeItem('kat_rpg_v4');
   localStorage.removeItem('kat_dev_no_limit');
   location.reload();
 }
@@ -3915,16 +4530,17 @@ const WIZARD_STEPS = [
       </div>
       <label class="wizard-field-label" style="margin-top:12px">Session length</label>
       <div class="wizard-opt-row">
-        ${[15,20,30,45].map(n=>`<button class="wizard-opt ${wPrefs.sessionLength===n?'sel':''}" onclick="wSet('sessionLength',${n},this)">${n} min</button>`).join('')}
+        ${[15,20,30,45,60].map(n=>`<button class="wizard-opt ${wPrefs.sessionLength===n?'sel':''}" onclick="wSet('sessionLength',${n},this)">${n} min</button>`).join('')}
       </div>
-      <label class="wizard-field-label" style="margin-top:12px">Equipment <span style="opacity:.5;font-size:10px">(select all that apply)</span></label>
+      <label class="wizard-field-label" style="margin-top:12px">Equipment <span style="opacity:.5;font-size:10px">(tick only what you actually have)</span></label>
       <div class="wizard-opt-group" id="w-equip-btns">
-        <button class="wizard-opt ${wPrefs.equipment.includes('bands')?'sel':''}"      data-val="bands"      onclick="wToggleEquip('bands',this)">Resistance bands</button>
-        <button class="wizard-opt ${wPrefs.equipment.includes('dumbbells')?'sel':''}"  data-val="dumbbells"  onclick="wToggleEquip('dumbbells',this)">Dumbbells</button>
-        <button class="wizard-opt ${wPrefs.equipment.includes('kettlebells')?'sel':''}" data-val="kettlebells" onclick="wToggleEquip('kettlebells',this)">Kettlebells</button>
-        <button class="wizard-opt ${wPrefs.equipment.includes('gym')?'sel':''}"        data-val="gym"        onclick="wToggleEquip('gym',this)">Full gym</button>
+        ${EQUIP_OPTIONS.map(o => `<button class="wizard-opt ${wPrefs.equipment.includes(o.v)?'sel':''}" data-val="${o.v}" onclick="wToggleEquip('${o.v}',this)">${o.label}</button>`).join('')}
       </div>
-      <div style="font-size:10px;color:var(--ink4);margin-top:4px">Nothing selected = bodyweight only</div>
+      <div class="wizard-opt-row" style="margin-top:6px">
+        <button class="wizard-opt" style="font-size:10px" onclick="wEquipPreset('all')">Full gym (all)</button>
+        <button class="wizard-opt" style="font-size:10px" onclick="wEquipPreset('none')">Bodyweight only</button>
+      </div>
+      <div style="font-size:10px;color:var(--ink4);margin-top:4px">Nothing ticked = bodyweight only. A small gym? Tick just dumbbells + cable + machines and leave barbell off.</div>
       <label class="wizard-field-label" style="margin-top:14px">Anything else? <span style="opacity:.6;font-size:10px">(optional)</span></label>
       <textarea class="s-input" id="w-exercise-note" placeholder="e.g. bad left knee — avoid high impact, prefer HIIT, training for a 5k, upper body focus…">${wPrefs.exerciseNote || ''}</textarea>
       <div style="font-size:10px;color:var(--ink4);margin-top:10px;line-height:1.6;padding:8px 10px;background:var(--parch2);border-radius:var(--radius);border:1px solid var(--parch4)">⚠ Sessions are AI-generated and may contain errors. Rep counts, form cues, and exercise selections should be treated as suggestions — not medical advice. Use common sense, listen to your body, and consult a qualified medical professional before starting any new exercise programme or if you have any health conditions or injuries.</div>`,
@@ -4026,11 +4642,27 @@ function wSetHeroClass(id, btn) {
 function wCustomClassInput(val) {
   wPrefs.heroClass = val.trim();
 }
+// Granular equipment — values match the exercise DB's `eq` buckets so
+// "I don't have a barbell" (small gym) works. Bodyweight is always available.
+const EQUIP_OPTIONS = [
+  { v: 'bands',       label: 'Resistance bands' },
+  { v: 'dumbbells',   label: 'Dumbbells' },
+  { v: 'kettlebells', label: 'Kettlebells' },
+  { v: 'barbell',     label: 'Barbell' },
+  { v: 'cable',       label: 'Cable machine' },
+  { v: 'machine',     label: 'Weight machines' },
+];
+const EQUIP_LABELS = { bands: 'resistance bands', dumbbells: 'dumbbells', kettlebells: 'kettlebells', barbell: 'barbell', cable: 'cable machine', machine: 'weight machines' };
+
 function wToggleEquip(val, btn) {
   const arr = wPrefs.equipment;
   const idx = arr.indexOf(val);
   if (idx === -1) arr.push(val); else arr.splice(idx, 1);
   btn.classList.toggle('sel', arr.includes(val));
+}
+function wEquipPreset(kind) {
+  wPrefs.equipment = kind === 'all' ? EQUIP_OPTIONS.map(o => o.v) : [];
+  renderWizard();
 }
 function sToggleEquip(btn) {
   const val = btn.dataset.val;
@@ -4045,8 +4677,7 @@ function sToggleEquip(btn) {
 function equipmentDesc(equipment) {
   if (!Array.isArray(equipment) || !equipment.length) return 'bodyweight only';
   if (equipment.includes('gym')) return 'full gym (barbells, cables, machines, dumbbells, kettlebells, etc.)';
-  const labels = { bands: 'resistance bands', dumbbells: 'dumbbells', kettlebells: 'kettlebells' };
-  return equipment.map(e => labels[e] || e).join(', ');
+  return 'bodyweight, ' + equipment.map(e => EQUIP_LABELS[e] || e).join(', ');
 }
 
 function wSetProvider(val, btn) {
@@ -4123,6 +4754,11 @@ async function beginAdventure() {
   WIZARD_STEPS[wStep].onNext();
   S.prefs = { ...wPrefs };
   if (wPrefs.name) S.name = wPrefs.name;
+  // name the first narrative after its genre now that we know it
+  const _n0 = activeNarrative();
+  if (_n0 && (!_n0.label || _n0.label === 'Adventure')) {
+    _n0.label = (wPrefs.genre || 'Adventure').replace(/^\w/, c => c.toUpperCase());
+  }
   applyGenreTheme(wPrefs.genre);
   applyDarkMode();
   save();
@@ -4158,113 +4794,68 @@ function runWizard() {
    SESSION GENERATION
 ════════════════════════════════════════════════════════════════ */
 async function generateSessions(mode) {
-  // 'continue' = new chapter same story, 'fresh' = brand new story, undefined = first-time wizard
+  // 'continue' = new chapter same story, 'levelup'/'majorlevelup' = routine refresh,
+  // undefined = first-time wizard. Exercises are picked from the real DB.
   const p = mode ? (S.prefs || wPrefs) : wPrefs;
-  // XP scales with level so later levels still feel rewarding despite higher thresholds
-  const lv      = getLv();
-  const baseXP  = Math.round(75 + (lv - 1) * 10);
-  const pushXP  = Math.round(baseXP * 1.2);
-  const genreStyle = {
-    fantasy: 'high fantasy — use evocative medieval/magical names (e.g. "The Grounding Stance" for a squat)',
-    scifi:   'sci-fi — use technical/futuristic names (e.g. "Gravitational Resistance Protocol" for a squat)',
-    mystery: 'noir mystery — use shadowy/investigative names (e.g. "The Crouching Surveillance Position" for a squat)',
-    cozy:    'cosy — use warm, gentle names (e.g. "The Morning Garden Stretch" for a squat)',
-  };
+  const { menuText, byId } = await buildExerciseMenu(p, { perPattern: 12, cap: 96 });
 
-  const continuationCtx = mode === 'continue'
-    ? (() => {
-        const cur = getSessions();
-        const summary = cur.map(s =>
-          `${s.label}:\n${s.exercises.map(e => `  - ${e.p}: ${e.sets}`).join('\n')}`
-        ).join('\n');
-        const loreExtra = S.loreNotes && S.loreNotes.length > 0
-          ? `\nEstablished canon for thematic names — callbacks to characters or places are encouraged:\n${S.loreNotes.map(n => `- ${n.text}`).join('\n')}`
-          : '';
-        return `\nNew arc, same hero. The player has completed ${S.sessions} sessions at Level ${getLv()} (streak: ${S.curStreak} days). Here is the current routine:\n\n${summary}\n\nGenerate fresh sessions at EXACTLY this difficulty — same exercise science level, same rep/set ranges. Refresh the exercise selection and thematic names but do not regress or jump difficulty. Preserve the role of each session: A=Recommended (xp=${baseXP}), B=Alternate (same effort, xp=${baseXP}), C=Push Yourself (harder, xp=${pushXP}).${loreExtra}`;
-      })()
-    : mode === 'levelup'
-    ? (() => {
-        const cur = getSessions();
-        const summary = cur.map(s =>
-          `${s.label}:\n${s.exercises.map(e => `  - ${e.p}: ${e.sets}${e.h ? ' — ' + e.h.slice(0, 60) : ''}`).join('\n')}`
-        ).join('\n');
-        return `\nLevel-up routine refresh. The user has completed ${S.sessions} sessions and just reached Level ${getLv()} (streak: ${S.curStreak} days). Here is their current routine:\n\n${summary}\n\nREGENERATE this routine with a SLIGHT difficulty progression: modestly increase reps or sets on some exercises (e.g. 2×10→2×12, or add a 3rd set to one exercise), and where appropriate substitute a harder variation of the same movement (e.g. knee push-up→full push-up, bodyweight squat→tempo squat). Do NOT make dramatic jumps. Keep the same session count (3), equipment, session length, genre aesthetic, and thematic name style. Preserve the role of each session: A=Recommended (balanced, xp=${baseXP}), B=Alternate (different pattern, same effort, xp=${baseXP}), C=Push Yourself (harder, xp=${pushXP}). Preserve exercises that don't need progression. Base all changes on established exercise science.`;
-      })()
-    : mode === 'majorlevelup'
-    ? (() => {
-        const cur = getSessions();
-        const summary = cur.map(s =>
-          `${s.label}:\n${s.exercises.map(e => `  - ${e.p}: ${e.sets}`).join('\n')}`
-        ).join('\n');
-        const weeksTraining = Math.round(S.sessions / 3);
-        return `\nMilestone level-up (Level ${getLv()}). The user has been training consistently for roughly ${weeksTraining} weeks. Here is their current routine:\n\n${summary}\n\nThis is a MAJOR PROGRAM OVERHAUL — retire this routine entirely and design a fresh program suited to someone who is no longer a beginner. Introduce movement patterns and exercises they have not been doing: if they have been doing bodyweight squats, consider split squats, reverse lunges, or single-leg variations; if they have been doing push-ups, consider pike push-ups, archer push-ups, or pseudo-planche leans; add unilateral, anti-rotation core work, or hinge patterns if absent. The new program should feel like a genuine step-change — different stimulus, different selection — not just added reps. Respect their equipment (${equipmentDesc(p.equipment)}) and session length (~${p.sessionLength} min). Keep the same session count (3), genre aesthetic, and thematic name style. Preserve the role of each session: A=Recommended (xp=${baseXP}), B=Alternate (xp=${baseXP}), C=Push Yourself (xp=${pushXP}).`;
-      })()
+  const loreExtra = (mode === 'continue' && S.loreNotes && S.loreNotes.length)
+    ? `\nEstablished canon for the thematic names — callbacks to characters or places are welcome:\n${S.loreNotes.map(n => `- ${n.text}`).join('\n')}`
     : '';
+  const refreshCtx = (() => {
+    if (!mode || mode === 'fresh') return '';
+    const cur = getSessions();
+    const summary = cur.map(s => `${s.label}: ${s.exercises.map(e => e.p).join(', ')}`).join('\n');
+    if (mode === 'continue')
+      return `\nSame hero, new arc (${S.sessions} sessions, Level ${getLv()}). Current routine:\n${summary}\nRefresh the exercise selection and thematic names at the same difficulty — pick different ids where you can.${loreExtra}`;
+    if (mode === 'majorlevelup')
+      return `\nMilestone overhaul (Level ${getLv()}). Current routine:\n${summary}\nRetire this selection — choose noticeably different movement patterns and harder variations from the menu. A genuine step-change.`;
+    return `\nLevel-up refresh (Level ${getLv()}). Current routine:\n${summary}\nKeep most of it; swap 1–2 exercises per session for slightly harder variations from the menu.`;
+  })();
 
-  const prompt = `Generate exactly 3 workout sessions for a ${p.experience} fitness level person.
-Session length: ~${p.sessionLength} minutes. Equipment: ${equipmentDesc(p.equipment)}.
-Aesthetic: ${genreStyle[p.genre] || genreStyle.fantasy}. Tone: ${p.tone}.${continuationCtx}
+  const prompt = `Build exactly 3 workout sessions (roles A, B, C) for a fitness app.
+Experience level: ${p.experience}. Genre theme for the thematic names: ${exerciseNameStyle()}. Tone: ${p.tone}.${refreshCtx}
+${p.exerciseNote ? `\nUser's training notes (honour these — pick safe menu ids accordingly): "${p.exerciseNote}"\n` : ''}
+Roles:
+  A (Recommended): balanced, covers the main movement patterns. 5 exercises.
+  B (Alternate): same difficulty as A, different exercises/emphasis so it can be done the day after A. 5 exercises.
+  C (Push Yourself): harder selection — more compound lifts / tougher variations. 5–6 exercises.
 
-Each session has a defined role — honour it precisely:
-  Session A (Recommended): The balanced, go-to session. Well-rounded, approachable, covers the key movement patterns. Best choice on most days.
-  Session B (Alternate): Same difficulty as A but different exercises and movement emphasis — variety without added strain. Someone who did A yesterday could do B today.
-  Session C (Push Yourself!): Meaningfully harder than A and B. More sets, harder variations, or higher reps. Should feel like a genuine challenge — reserve for good days.
+Choose every exercise ONLY from the menu below, by its exact id. Do NOT invent exercises, and do NOT specify sets/reps/rest — the app fills those in from exercise-science guidelines.
+Menu items tagged "stretch" or "plyo" are optional extras: use a "stretch" only as a warm-up/cool-down piece or on a mobility-leaning day; use "plyo" only in Session C or for conditioning, and skip it for a beginner unless the user's notes ask for it.
+MENU (id | name | pattern | equipment | tags):
+${menuText}
 
-Return ONLY a raw JSON array — no markdown, no code fences, no explanation.
+Return ONLY a raw JSON array, no markdown or code fences:
 [
-  {
-    "label": "Session A — [Thematic Name]",
-    "sub": "~${p.sessionLength} min · the recommended starting point",
-    "xp": ${baseXP},
-    "exercises": [
-      {"f": "[thematic name]", "p": "[plain name]", "h": "[1-2 sentence how-to${p.experience==='beginner'?' with easier modification option':''}]", "sets": "[e.g. 2 × 10]", "xp": 15}
-    ]
-  },
-  {
-    "label": "Session B — [Thematic Name]",
-    "sub": "~${p.sessionLength} min · an alternate path, same effort",
-    "xp": ${baseXP},
-    "exercises": []
-  },
-  {
-    "label": "Session C — [Thematic Name]",
-    "sub": "~${p.sessionLength} min · for when you want more",
-    "xp": ${pushXP},
-    "exercises": []
-  }
-]
-Rules: 4-5 exercises per session. Sessions A and B target different muscle groups/movement patterns. Session C may overlap with A or B but turns up the volume. Use the xp values shown above exactly — they are calibrated for the player's current level.${(!Array.isArray(p.equipment)||!p.equipment.length)?' Bodyweight/floor/wall only — no equipment at all.':''}
-${p.exerciseNote ? `\nUser's training notes (honor these): "${p.exerciseNote}"` : ''}
-Base all exercise choices and parameters (sets, reps, rest) on established exercise science — ACE, ACSM, and peer-reviewed guidelines. If the user notes any injuries or limitations, substitute safe alternatives and briefly note why in the how-to field.`;
+  {"role":"A","label":"Session A — [thematic name]","sub":"the recommended starting point","exercises":[{"id":"exact menu id","f":"thematic ${exerciseNameStyle()} name"}]},
+  {"role":"B","label":"Session B — [thematic name]","sub":"an alternate path, same effort","exercises":[]},
+  {"role":"C","label":"Session C — [thematic name]","sub":"for when you want more","exercises":[]}
+]`;
 
-  const text = await callApi([{ role:'user', content: prompt }], { maxTokens: 2500 });
+  const text = await callApi([{ role: 'user', content: prompt }], { maxTokens: 2000 });
 
-  let sessions;
+  let raw;
   try {
-    const clean = text.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
-    sessions = JSON.parse(clean);
-  } catch(_) {
+    raw = JSON.parse(text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim());
+  } catch (_) {
     const m = text.match(/\[[\s\S]*\]/);
     if (!m) throw new Error('Could not parse sessions JSON');
-    sessions = JSON.parse(m[0]);
+    raw = JSON.parse(m[0]);
   }
+  if (!Array.isArray(raw) || raw.length === 0) throw new Error('Invalid sessions');
 
-  if (!Array.isArray(sessions) || sessions.length === 0) throw new Error('Invalid sessions');
-
-  // Distribute xp evenly across exercises
-  sessions = sessions.map((sess) => {
-    const n = sess.exercises ? sess.exercises.length : 0;
-    const base  = n > 0 && sess.xp ? Math.floor(sess.xp / n) : 15;
-    const extra = n > 0 && sess.xp ? sess.xp - base * n : 0;
+  const sessions = raw.slice(0, 3).map((sess, i) => {
+    const isC = (sess.role || '').toUpperCase() === 'C' || i === 2;
+    const exercises = hydrateChosenExercises(sess.exercises, p, { harder: isC, byId });
     return {
-      ...sess,
-      exercises: (sess.exercises || []).map((ex, j) => ({
-        ...ex,
-        xp: base + (j === 0 ? extra : 0),
-      })),
+      label: String(sess.label || `Session ${String.fromCharCode(65 + i)}`),
+      sub:   String(sess.sub || ''),
+      exercises,
     };
-  });
+  }).filter(s => s.exercises.length);
 
+  if (!sessions.length) throw new Error('No usable exercises were generated — try again.');
   S.customSessions = sessions;
 }
 
@@ -4816,6 +5407,22 @@ function go(id, btn) {
   if (id === 'settings') populateCustomizationFields();
 }
 
+// Options panel has three sub-sections: workout / narratives / settings.
+function optTab(name, btn) {
+  document.querySelectorAll('#settings .opt-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('#settings .opt-tab').forEach(b => b.classList.remove('active'));
+  const sec = document.getElementById('opt-' + name);
+  if (sec) sec.classList.add('active');
+  if (btn) btn.classList.add('active');
+  else { const b = document.getElementById('opt-tab-' + name); if (b) b.classList.add('active'); }
+}
+// Jump straight to a sub-tab from elsewhere (e.g. the difficulty nudge).
+function goOpt(name) {
+  const navBtn = document.querySelector('.nav-btn[onclick*="settings"]');
+  if (navBtn) go('settings', navBtn);
+  optTab(name);
+}
+
 function savePronouns(val, btn) {
   if (!S.prefs) S.prefs = {};
   S.prefs.pronouns = val;
@@ -4962,8 +5569,9 @@ function populateCustomizationFields() {
   selBtn('s-len-btns',   p.sessionLength || 20);
   selBtn('s-days-btns',  p.daysPerWeek   || 3);
   const equips = Array.isArray(p.equipment) ? p.equipment : [];
+  const gymAlias = equips.includes('gym') ? ['barbell', 'cable', 'machine', 'dumbbells', 'kettlebells'] : [];
   document.querySelectorAll('#s-equip-btns .wizard-opt').forEach(btn => {
-    btn.classList.toggle('sel', equips.includes(btn.dataset.val));
+    btn.classList.toggle('sel', equips.includes(btn.dataset.val) || gymAlias.includes(btn.dataset.val));
   });
 
   renderCharIdentity();
@@ -5292,7 +5900,7 @@ const TUTORIAL_STEPS = [
   {
     ornament: '⚔️',
     title: 'Your Hero',
-    body: 'This is your character. Sessions completed, XP earned, and your Strength, Endurance, and Agility all grow as you train consistently.',
+    body: 'This is your character. Your level, XP, sessions completed, and streak all grow as you train consistently.',
     sel: '.kat-header', tab: 'quest'
   },
   {
@@ -5310,7 +5918,7 @@ const TUTORIAL_STEPS = [
   {
     ornament: '📋',
     title: 'Choose a Session',
-    body: 'Pick a session type from these tabs. Each has a different duration and XP reward. Work through the exercises at your own pace.',
+    body: 'Pick a session type from these tabs. Each has a different focus and length. Work through the exercises at your own pace.',
     sel: '#sess-tabs', tab: 'train'
   },
   {
@@ -5517,12 +6125,17 @@ function init() {
 }
 init();
 
+/* Service worker is DISABLED during the redesign — its caching kept serving a
+   stale/blank page on mobile where there are no DevTools to clear it. This block
+   actively tears down any previously-installed SW and its caches, so one clean
+   load fixes a wedged phone. Re-enable registration near the end of the rebuild. */
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').then(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      registerPeriodicSync();
-    }
-  }).catch(() => {});
+  navigator.serviceWorker.getRegistrations()
+    .then(regs => Promise.all(regs.map(r => r.unregister())))
+    .catch(() => {});
+  if (self.caches && caches.keys) {
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
+  }
 }
 </script>
 </body>

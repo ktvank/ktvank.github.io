@@ -1,12 +1,13 @@
-﻿const CACHE = 'kat-rpg-v5';
+﻿const CACHE = 'kat-rpg-v7';
 const CORE  = ['./index.html', './icon-192.png', './icon-512.png', './manifest.json'];
 
-// â”€â”€ Install / Activate / Fetch (unchanged) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Install / Activate / Fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(CORE))
+      // best-effort: one missing asset must not fail the whole install
+      .then(c => Promise.all(CORE.map(u => c.add(u).catch(() => {}))))
       .then(() => self.skipWaiting())
   );
 });
@@ -21,20 +22,28 @@ self.addEventListener('activate', e => {
   );
 });
 
+// Network-first for same-origin GETs: a reload always gets the latest code when
+// online. Only fall back to cache when the network actually fails (offline),
+// and for a failed navigation fall back to the cached shell so the app still
+// opens rather than showing a blank screen.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      const network = fetch(e.request).then(resp => {
-        if (resp && resp.ok) {
-          const clone = resp.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return resp;
-      }).catch(() => cached);
-      return cached || network;
+    fetch(e.request).then(resp => {
+      if (resp && resp.ok) {
+        const clone = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
+      }
+      return resp;
+    }).catch(async () => {
+      const hit = await caches.match(e.request);
+      if (hit) return hit;
+      if (e.request.mode === 'navigate') {
+        return (await caches.match('./index.html')) || Response.error();
+      }
+      return Response.error();
     })
   );
 });
