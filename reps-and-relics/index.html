@@ -1530,6 +1530,13 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
         </div>
         <button class="s-btn danger" onclick="doWipeAll()">Wipe all</button>
       </div>
+      <div class="s-row" style="margin-top:14px">
+        <div>
+          <div class="s-lbl">Force refresh</div>
+          <div class="s-sub">Clears the cached app and reloads from the server. Use this if an update won't show up. Does not touch your data or API key.</div>
+        </div>
+        <button class="s-btn" onclick="forceRefreshApp()">Force refresh</button>
+      </div>
     </div>
   </div>
 </div><!-- /settings -->
@@ -7086,17 +7093,28 @@ function init() {
 }
 init();
 
-/* Service worker is DISABLED during the redesign — its caching kept serving a
-   stale/blank page on mobile where there are no DevTools to clear it. This block
-   actively tears down any previously-installed SW and its caches, so one clean
-   load fixes a wedged phone. Re-enable registration near the end of the rebuild. */
+/* Service worker: offline caching so the gym still works on flaky Wi-Fi.
+   - network-first for the app shell (updates land on reload when online)
+   - cache-first for exercises.json (a hard dependency — never block a workout)
+   - updateViaCache:'none' so the browser never serves a stale sw.js
+   forceRefreshApp() below is the manual escape hatch (Settings → Developer). */
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations()
-    .then(regs => Promise.all(regs.map(r => r.unregister())))
-    .catch(() => {});
-  if (self.caches && caches.keys) {
-    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
-  }
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
+  });
+}
+async function forceRefreshApp() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (self.caches && caches.keys) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) {}
+  location.reload();
 }
 </script>
 </body>

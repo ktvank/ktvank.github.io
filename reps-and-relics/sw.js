@@ -1,7 +1,8 @@
-﻿const CACHE = 'kat-rpg-v7';
-const CORE  = ['./index.html', './icon-192.png', './icon-512.png', './manifest.json'];
+const CACHE = 'kat-rpg-v8';
+const CORE  = ['./index.html', './exercises.json', './icon-192.png', './icon-512.png', './manifest.json'];
+const NET_TIMEOUT = 4000; // ms — how long we wait on the network before using cache
 
-// â”€â”€ Install / Activate / Fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Install / Activate ──────────────────────────────────────────────
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -22,33 +23,60 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Network-first for same-origin GETs: a reload always gets the latest code when
-// online. Only fall back to cache when the network actually fails (offline),
-// and for a failed navigation fall back to the cached shell so the app still
-// opens rather than showing a blank screen.
+// ── Fetch ───────────────────────────────────────────────────────────
+// Three strategies for same-origin GETs:
+//  • exercises.json  → cache-first (stale-while-revalidate). It's a hard
+//    dependency now; a flaky gym connection must never block a workout.
+//  • navigations / index.html → network-first with a timeout, so updates
+//    land when online but the app still opens instantly when offline.
+//  • everything else → network-first, cache the good responses.
+
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;
-  e.respondWith(
-    fetch(e.request).then(resp => {
-      if (resp && resp.ok) {
-        const clone = resp.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
-      }
-      return resp;
-    }).catch(async () => {
-      const hit = await caches.match(e.request);
-      if (hit) return hit;
-      if (e.request.mode === 'navigate') {
-        return (await caches.match('./index.html')) || Response.error();
-      }
-      return Response.error();
-    })
-  );
+
+  const isExDB = url.pathname.endsWith('/exercises.json') || url.pathname === '/exercises.json';
+  if (isExDB) {
+    e.respondWith(staleWhileRevalidate(e.request));
+    return;
+  }
+  e.respondWith(networkFirst(e.request));
 });
 
-// â”€â”€ Periodic Background Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function put(req, resp) {
+  if (resp && resp.ok) {
+    const clone = resp.clone();
+    caches.open(CACHE).then(c => c.put(req, clone)).catch(() => {});
+  }
+  return resp;
+}
+
+async function staleWhileRevalidate(req) {
+  const hit = await caches.match(req);
+  const net = fetch(req).then(r => put(req, r)).catch(() => null);
+  return hit || (await net) || Response.error();
+}
+
+async function networkFirst(req) {
+  try {
+    const resp = await Promise.race([
+      fetch(req).then(r => put(req, r)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), NET_TIMEOUT)),
+    ]);
+    if (resp) return resp;
+    throw new Error('no-resp');
+  } catch (_) {
+    const hit = await caches.match(req);
+    if (hit) return hit;
+    if (req.mode === 'navigate') {
+      return (await caches.match('./index.html')) || Response.error();
+    }
+    return Response.error();
+  }
+}
+
+// ── Periodic Background Sync ─────────────────────────────────────────
 
 self.addEventListener('periodicsync', e => {
   if (e.tag === 'kat-rpg-reminder') {
@@ -73,7 +101,7 @@ async function checkAndNotify() {
 
   if (effectiveGap < (nagAfterDays || 2)) return;
 
-  // Pick message â€” customReminders have the hero name baked in already
+  // Pick message — customReminders have the hero name baked in already
   const fallback = [
     `${name} hasn't trained in a while. The adventure is waiting.`,
     `It's been a few days, ${name}. Your body remembers even when your schedule doesn't.`,
@@ -109,7 +137,7 @@ function readReminderState() {
   });
 }
 
-// â”€â”€ Push (server-sent, future use) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Push (server-sent, future use) ──────────────────────────────────
 
 self.addEventListener('push', e => {
   const data = e.data ? e.data.json() : {};
@@ -124,7 +152,7 @@ self.addEventListener('push', e => {
   );
 });
 
-// â”€â”€ Notification click â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Notification click ──────────────────────────────────────────────
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
