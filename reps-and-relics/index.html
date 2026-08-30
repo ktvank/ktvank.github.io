@@ -936,8 +936,8 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
   transition: top .22s ease, left .22s ease;
 }
 
-/* ── HOARD › PARTY SUB-TAB ───────────────────────────────────── */
-#hoard-party { padding-top: 2px; }
+/* ── HOARD › CAST SUB-TAB ────────────────────────────────────── */
+#hoard-cast { padding-top: 2px; }
 
 .companion-unlock-banner {
   padding: 10px 14px; margin-bottom: 12px;
@@ -1221,13 +1221,13 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 </div><!-- /streak -->
 
 <!-- ══════════════════════════════════════════════════════════ -->
-<!-- HOARD TAB  (Loot · Badges · Party)                         -->
+<!-- HOARD TAB  (Loot · Badges · Cast)                          -->
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="panel" id="hoard">
   <div class="opt-tabs">
     <button class="opt-tab active" id="hoard-tab-loot"   onclick="hoardTab('loot',this)">Loot</button>
     <button class="opt-tab"        id="hoard-tab-badges" onclick="hoardTab('badges',this)">Badges</button>
-    <button class="opt-tab"        id="hoard-tab-party"  onclick="hoardTab('party',this)">Party</button>
+    <button class="opt-tab"        id="hoard-tab-cast"   onclick="hoardTab('cast',this)">Cast</button>
   </div>
 
   <div class="opt-section active" id="hoard-loot">
@@ -1247,11 +1247,11 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
     <div class="badges-grid" id="badges-grid"></div>
   </div>
 
-  <div class="opt-section" id="hoard-party">
+  <div class="opt-section" id="hoard-cast">
     <div class="companion-unlock-banner" id="companion-unlock-banner"></div>
     <div class="companions-header">
-      <div class="companions-title">Your Party</div>
-      <div class="companions-sub">Complete sessions to unlock new companions</div>
+      <div class="companions-title">Your Cast</div>
+      <div class="companions-sub">Complete sessions to meet new characters</div>
     </div>
     <div class="companions-grid" id="companions-grid"></div>
     <div class="lore-strip" id="lore-strip">
@@ -6291,7 +6291,7 @@ Generate a companion profile as raw JSON (no markdown):
       req:     slotReq,
       name:    data.name,
       icon:    data.icon  || '✨',
-      intro:   data.intro || `${data.name} has joined your party.`,
+      intro:   data.intro || `${data.name} enters your story.`,
       profile: data.profile || '',
       voice:   data.voice   || 'Keep responses concise — 2–3 sentences.',
       appearance: data.appearance || '',
@@ -6326,12 +6326,12 @@ async function companionCheck() {
 function announceCompanion(c) {
   const banner = document.getElementById('companion-unlock-banner');
   if (banner) {
-    banner.textContent = `${c.icon}  New companion unlocked: ${c.name} — ${c.intro}`;
+    banner.textContent = `${c.icon}  New character: ${c.name} — ${c.intro}`;
     banner.classList.add('show');
     setTimeout(() => banner.classList.remove('show'), 6000);
   }
   renderCompanionsPanel();
-  toast(`${c.icon} ${c.name} has joined your party.`);
+  toast(`${c.icon} ${c.name} enters your story.`);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -6361,7 +6361,7 @@ function goOpt(name) {
   optTab(name);
 }
 
-// Hoard panel has three sub-sections: loot / badges / party.
+// Hoard panel has three sub-sections: loot / badges / cast.
 function hoardTab(name, btn) {
   document.querySelectorAll('#hoard .opt-section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('#hoard .opt-tab').forEach(b => b.classList.remove('active'));
