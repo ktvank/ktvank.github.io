@@ -353,6 +353,28 @@ body {
 .ex-how   { font-size: 10.5px; color: var(--ink3); display: block; margin-top: 3px; line-height: 1.55; }
 
 .ex-meta  { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding-top: 2px; }
+
+.ex-feel { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 7px; padding-left: 42px; }
+.ex-feel-q { font-size: 10px; color: var(--ink4); font-style: italic; }
+.ex-feel-btn {
+  font-size: 10px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--parch4); background: var(--parch); color: var(--ink3);
+  cursor: pointer; transition: all .15s; -webkit-tap-highlight-color: transparent;
+}
+.ex-feel-btn:hover { border-color: var(--ink3); color: var(--ink); }
+.ex-feel-btn.sel { background: var(--sage3); border-color: var(--sage2); color: var(--sage2); }
+.ex-item.checked .ex-feel { opacity: 1; }
+
+/* ── PROGRESSION LOG (Streak tab) ────────────────────────────── */
+.prog-log { display: flex; flex-direction: column; gap: 12px; }
+.prog-ex { border: 1px solid var(--parch4); border-radius: var(--radius); padding: 10px 12px; background: var(--parch); }
+.prog-ex-name { font-size: 12px; color: var(--ink); font-family: var(--font-display); letter-spacing: .03em; margin-bottom: 6px; }
+.prog-row { display: flex; gap: 8px; font-size: 11px; color: var(--ink3); line-height: 1.5; }
+.prog-row .prog-when { color: var(--ink4); font-family: var(--font-mono); white-space: nowrap; min-width: 46px; }
+.prog-row .prog-what { flex: 1; }
+.prog-row.up .prog-what   { color: var(--sage2); }
+.prog-row.deload .prog-what { color: var(--ink3); font-style: italic; }
+.prog-empty { font-size: 11px; color: var(--ink4); font-style: italic; }
 .ex-sets  { font-size: 12px; color: var(--sage2); font-family: var(--font-mono); white-space: nowrap; }
 .ex-xp    { font-size: 9px; color: var(--ink4); font-family: var(--font-mono); }
 .ex-edit-btn {
@@ -1147,6 +1169,9 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
   </div>
   <div class="sect">Last 28 days</div>
   <div class="cal-grid" id="cal-grid"></div>
+
+  <div class="sect">Progression</div>
+  <div class="prog-log" id="prog-log"></div>
 </div><!-- /streak -->
 
 <!-- ══════════════════════════════════════════════════════════ -->
@@ -2047,6 +2072,120 @@ function hydrateChosenExercises(chosen, prefs, { goal = 'hypertrophy', harder = 
   return out;
 }
 
+/* ════════════════════════════════════════════════════════════════
+   FEEL-BASED PROGRESSION  (Phase 4)
+   Shared core: S.baselines[key], S.workoutLog[], S.progressionLog[].
+   After an exercise the user optionally taps Easy / Good / Tough. Two
+   "Easy" in a row nudges that exercise up a notch; two "Tough" eases it
+   back. Numbers are computed, not shown unless the user asks.
+════════════════════════════════════════════════════════════════ */
+const READY_STREAK_TO_ADVANCE   = 2;
+const STRUGGLE_STREAK_TO_DELOAD  = 2;
+const LOWER_BODY_MUSCLES = ['quadriceps', 'glutes', 'hamstrings', 'calves', 'abductors', 'adductors'];
+const FEEL_LABELS = { easy: 'Easy', ok: 'Good', hard: 'Tough' };
+
+function baselineKey(ex) { return ex.exId || ('name:' + (ex.p || ex.f || 'exercise')); }
+function getBaseline(ex) { return (S.baselines || {})[baselineKey(ex)]; }
+
+function exKindFor(ex) {
+  if (parseHoldSec(ex.sets) > 0) return 'timed';
+  const rec = ex.exId ? exById(ex.exId) : null;
+  if (rec && rec.force === 'static') return 'timed';
+  if (!rec || rec.eq === 'bodyweight') return 'bodyweight';
+  return 'load';
+}
+// "2 × 8–12" / "3 × 30s" → { sets, lo, hi }
+function parseSetsSpec(setsStr) {
+  const s = String(setsStr || '');
+  const sets = parseSetCount(s);
+  const hold = parseHoldSec(s);
+  if (hold > 0) return { sets, lo: hold, hi: hold };
+  const m = s.match(/[×xX]\s*(\d+)\s*(?:[–\-]\s*(\d+))?/);
+  const lo = m ? parseInt(m[1], 10) : 8;
+  const hi = m && m[2] ? parseInt(m[2], 10) : lo;
+  return { sets, lo, hi: Math.max(lo, hi) };
+}
+
+// Create (lazily) the baseline for an exercise from its current prescription.
+function ensureBaseline(ex) {
+  if (!S.baselines) S.baselines = {};
+  const key = baselineKey(ex);
+  if (S.baselines[key]) return S.baselines[key];
+  const rec  = ex.exId ? exById(ex.exId) : null;
+  const kind = exKindFor(ex);
+  const spec = parseSetsSpec(ex.sets);
+  const lower = !!(rec && (rec.pm || []).some(m => LOWER_BODY_MUSCLES.includes(m)));
+  const b = {
+    kind, sets: spec.sets,
+    repRange: kind === 'timed' ? [spec.lo, spec.lo + 30] : [spec.lo, spec.hi],
+    targetReps: spec.lo,
+    load: kind === 'load' ? (ex.load || 0) : null, unit: 'lb',
+    lower,
+    readyStreak: 0, struggleStreak: 0,
+    startedAt: today(),
+  };
+  S.baselines[key] = b;
+  if (!S.progressionLog) S.progressionLog = [];
+  return b;
+}
+
+// The sets/reps string actually shown (baseline-driven once a baseline exists).
+function displaySetsFor(ex) {
+  const b = getBaseline(ex);
+  if (!b) return ex.sets || '';
+  if (b.kind === 'timed') return `${b.sets} × ${b.targetReps}s`;
+  if (b.kind === 'load' && b.load > 0) return `${b.sets} × ${b.targetReps} · ${b.load} ${b.unit}`;
+  return `${b.sets} × ${b.targetReps}`;
+}
+
+function loadIncrement(b) {
+  if (!b.load || b.load <= 0) return b.lower ? 10 : 5;
+  const step = b.load >= 40 ? 5 : 2.5;
+  const raw  = b.load * (b.lower ? 0.075 : 0.05);
+  return Math.max(step, Math.round(raw / step) * step);
+}
+function logProgression(ex, change, from, to, trigger) {
+  if (!S.progressionLog) S.progressionLog = [];
+  S.progressionLog.push({ date: today(), key: baselineKey(ex), name: ex.p || ex.f || 'Exercise', change, from, to, trigger });
+  if (S.progressionLog.length > 400) S.progressionLog = S.progressionLog.slice(-400);
+}
+
+// Apply one session's feel to an exercise. Returns 'up' | 'down' | null.
+function applyFeel(ex, feel) {
+  const b = ensureBaseline(ex);
+  if (feel === 'easy')      { b.readyStreak++; b.struggleStreak = 0; }
+  else if (feel === 'hard') { b.struggleStreak++; b.readyStreak = 0; }
+  else                      { b.readyStreak = 0; b.struggleStreak = 0; return null; }
+
+  if (b.readyStreak >= READY_STREAK_TO_ADVANCE) {
+    b.readyStreak = 0;
+    const from = displaySetsFor(ex);
+    if (b.targetReps < b.repRange[1]) {
+      b.targetReps = Math.min(b.repRange[1], b.targetReps + (b.kind === 'timed' ? 5 : 1));
+      logProgression(ex, b.kind === 'timed' ? 'time' : 'reps', from, displaySetsFor(ex), 'two easy sessions');
+    } else if (b.kind === 'load') {
+      b.load = (b.load || 0) + loadIncrement(b);
+      b.targetReps = b.repRange[0];
+      logProgression(ex, 'load', from, displaySetsFor(ex), 'two easy sessions');
+    } else {
+      b.sets = Math.min(4, b.sets + 1);
+      b.targetReps = b.repRange[0];
+      logProgression(ex, 'sets', from, displaySetsFor(ex), 'two easy sessions');
+    }
+    return 'up';
+  }
+  if (b.struggleStreak >= STRUGGLE_STREAK_TO_DELOAD) {
+    b.struggleStreak = 0;
+    const from = displaySetsFor(ex);
+    if (b.kind === 'load' && b.load > 0) b.load = Math.max(0, Math.round((b.load * 0.9) / 2.5) * 2.5);
+    else if (b.sets > 2) b.sets -= 1;
+    else b.targetReps = Math.max(b.repRange[0], b.targetReps - (b.kind === 'timed' ? 5 : 2));
+    logProgression(ex, 'deload', from, displaySetsFor(ex), 'two tough sessions');
+    return 'down';
+  }
+  return null;
+}
+
 const LEVEL_LOOT_LV2_BY_CLASS = {
   fantasy: {
     mage:     { id:"lv2", n:"Apprentice's Focus Crystal",  ic:"💎", t:"artifact", r:1, d:"Steadies the channel. Hums at an encouraging frequency." },
@@ -2371,6 +2510,11 @@ let S = {
   pauseUntil:      null,  // ISO date string — streak & reminders frozen until this date
   offDays:         [],    // ISO date strings marked as intentional rest days
   earnedTitles:    [],    // 2-word epithets generated at every 5th level
+  // ── shared training core (Phase 4) — spans every narrative ──
+  baselines:       {},    // exId/name key → { kind, sets, repRange, targetReps, load, readyStreak, struggleStreak, … }
+  workoutLog:      [],     // [{ date, narrativeId, role, entries:[{key,name,feel}] }]
+  progressionLog:  [],     // [{ date, key, name, change, from, to, trigger }]
+  exerciseFeel:    {},     // { "si-ei": "easy"|"ok"|"hard" } — in-progress feel taps, cleared on complete
 };
 
 let curLootFilter = 'all';
@@ -3151,6 +3295,20 @@ function toggleCheck(si, ei) {
   updateCompleteBtn(si);
 }
 
+function setFeel(si, ei, feel) {
+  if (!S.exerciseFeel) S.exerciseFeel = {};
+  const key = `${si}-${ei}`;
+  S.exerciseFeel[key] = S.exerciseFeel[key] === feel ? undefined : feel;
+  save();
+  const row = document.querySelector(`#ex-item-${si}-${ei} .ex-feel`);
+  if (row) {
+    row.querySelectorAll('.ex-feel-btn').forEach(b => {
+      const f = b.getAttribute('onclick').match(/'(\w+)'\)$/)[1];
+      b.classList.toggle('sel', S.exerciseFeel[key] === f);
+    });
+  }
+}
+
 function updateCompleteBtn(si) {
   const btn = document.querySelector('.complete-btn');
   if (!btn) return;
@@ -3638,7 +3796,7 @@ function renderWorkoutCard() {
             <div class="ex-plain">${escHtml(e.p)}<span class="ex-how">${escHtml(withName(e.h))}</span></div>
           </div>
           <div class="ex-meta">
-            <div class="ex-sets">${e.sets}</div>
+            <div class="ex-sets">${escHtml(displaySetsFor(e))}</div>
             <div style="display:flex;gap:2px">
               <button class="ex-info-btn" onclick="openExerciseDetail(${curSess},${i})" title="How to do this exercise" aria-label="How to do this exercise">
                 <i class="ti ti-info-circle"></i>
@@ -3651,6 +3809,13 @@ function renderWorkoutCard() {
               </button>
             </div>
           </div>
+          ${isChecked ? `<div class="ex-feel" role="group" aria-label="How did that feel?">
+            <span class="ex-feel-q">How did that feel?</span>
+            ${['easy','ok','hard'].map(f => {
+              const sel = (S.exerciseFeel || {})[`${curSess}-${i}`] === f;
+              return `<button class="ex-feel-btn${sel ? ' sel' : ''}" onclick="setFeel(${curSess},${i},'${f}')">${FEEL_LABELS[f]}</button>`;
+            }).join('')}
+          </div>` : ''}
         </li>`;
       }).join('')}
       ${newEditForm}
@@ -3707,6 +3872,33 @@ function renderStreakTab() {
     div.innerHTML = `<span class="cd-n">${d.getDate()}</span>`;
     grid.appendChild(div);
   }
+  renderProgressionLog();
+}
+
+function renderProgressionLog() {
+  const el = document.getElementById('prog-log');
+  if (!el) return;
+  const log = (S.progressionLog || []).slice();
+  if (!log.length) {
+    el.innerHTML = `<div class="prog-empty">Nothing yet. Tap <strong>Easy / Good / Tough</strong> after your exercises — two easy sessions in a row and that move steps up on its own.</div>`;
+    return;
+  }
+  // group by exercise key, most-recently-changed first
+  const byKey = {};
+  for (const e of log) (byKey[e.key] = byKey[e.key] || []).push(e);
+  const groups = Object.values(byKey).sort((a, b) =>
+    (b[b.length - 1].date).localeCompare(a[a.length - 1].date));
+  const fmt = ds => { const [y, m, d] = ds.split('-'); return `${+m}/${+d}`; };
+  const verb = { reps: 'reps up', time: 'longer hold', load: 'load up', sets: 'added a set', deload: 'eased back', start: 'started' };
+  el.innerHTML = groups.map(rows => `
+    <div class="prog-ex">
+      <div class="prog-ex-name">${escHtml(rows[rows.length - 1].name)}</div>
+      ${rows.slice().reverse().map(r => `
+        <div class="prog-row ${r.change === 'deload' ? 'deload' : 'up'}">
+          <span class="prog-when">${fmt(r.date)}</span>
+          <span class="prog-what">${escHtml(verb[r.change] || r.change)} — ${escHtml(r.from || '')} → <strong>${escHtml(r.to || '')}</strong></span>
+        </div>`).join('')}
+    </div>`).join('');
 }
 
 /* ── Loot tab ───────────────────────────────────────────────── */
@@ -3884,6 +4076,26 @@ async function completeSession(i) {
   if (!S.completedSessList.includes(i)) S.completedSessList.push(i);
   S.storyChaptersUnlocked = (S.storyChaptersUnlocked || 0) + 1;
 
+  // ── Feel-based progression + workout log (shared core) ──
+  try { await loadExerciseDB(); } catch (_) { /* kind/muscle detection degrades gracefully */ }
+  const checked = S.exerciseChecked || {};
+  const feelMap = S.exerciseFeel || {};
+  const logEntries = [];
+  const advanced = [];
+  let anyDeload = false;
+  sess.exercises.forEach((ex, ei) => {
+    if (!checked[`${i}-${ei}`]) return;
+    const feel = feelMap[`${i}-${ei}`] || 'ok';
+    const dir  = applyFeel(ex, feel);
+    if (dir === 'up')   advanced.push(ex.p || ex.f);
+    if (dir === 'down') anyDeload = true;
+    logEntries.push({ key: baselineKey(ex), name: ex.p || ex.f, feel });
+  });
+  if (!S.workoutLog) S.workoutLog = [];
+  S.workoutLog.push({ date: t, narrativeId: S.activeNarrativeId, role: i, entries: logEntries });
+  if (S.workoutLog.length > 300) S.workoutLog = S.workoutLog.slice(-300);
+  S.exerciseFeel = {};
+
   // Clear checked exercises for this session
   if (S.exerciseChecked) {
     S.exerciseChecked = Object.fromEntries(
@@ -3910,6 +4122,16 @@ async function completeSession(i) {
   renderAll();
   playSound('complete');
   toast(`✦ +${xpEarned} XP · Session ${S.sessions} complete${S.arcComplete ? ' · Chapter complete!' : ''}`);
+
+  // Strength milestones — fanfare for going up, no shaming for easing back.
+  if (advanced.length) {
+    setTimeout(() => {
+      playSound('levelup');
+      toast(`💪 Stronger — ${advanced.slice(0, 2).join(' & ')}${advanced.length > 2 ? ` +${advanced.length - 2}` : ''} moved up a notch`);
+    }, 900);
+  } else if (anyDeload) {
+    setTimeout(() => toast(`Eased something back a little — smart. Strength isn't a straight line.`), 900);
+  }
 
   await checkAndTopUp();
 
