@@ -103,7 +103,7 @@ body[data-genre="mystery"] {
 }
 body[data-genre="cozy"] {
   --parch:  #fdf6f0; --parch2: #f8ede4; --parch3: #f0e0d4; --parch4: #e4cec0;
-  --ink:    #3d2010; --ink2:   #6a3d28; --ink3:   #9a6855; --ink4:   #c89885;
+  --ink:    #3d2010; --ink2:   #6a3d28; --ink3:   #9a6855; --ink4:   #a97e68;
   --sage:   #c87090; --sage2:  #a04870; --sage3:  #f8e0ec; --sage4:  #fff0f6;
   --rose:   #e07060; --rose2:  #b04840; --rose3:  #f8dcd8; --rose4:  #fff4f2;
   --sky:    #7098b8; --sky2:   #4a7098; --sky3:   #d5e5f2; --sky4:   #edf4fa;
@@ -120,7 +120,7 @@ body[data-genre="cozy"] {
 
 body[data-genre="anime"] {
   --parch:  #f4f7ff; --parch2: #e9f0ff; --parch3: #dbe6ff; --parch4: #c3d4f5;
-  --ink:    #16203a; --ink2:   #35406a; --ink3:   #6b78a0; --ink4:   #9aa6c8;
+  --ink:    #16203a; --ink2:   #35406a; --ink3:   #6b78a0; --ink4:   #737f9e;
   --sage:   #3b6bff; --sage2:  #2748d8; --sage3:  #dbe4ff; --sage4:  #eef2ff;
   --rose:   #ff5a3c; --rose2:  #d8371c; --rose3:  #ffe0d8; --rose4:  #fff2ee;
   --sky:    #17b7e6; --sky2:   #0d8fbc; --sky3:   #d4f0fb; --sky4:   #eefaff;
@@ -364,12 +364,15 @@ body {
 .ex-check-btn:hover        { color: var(--sage); background: var(--sage4); }
 .ex-item.checked .ex-check-btn { color: var(--sage); }
 
-.ex-content { min-width: 0; padding-top: 2px; }
+.ex-content { min-width: 0; padding-top: 2px; cursor: pointer; }
+.ex-content:focus-visible { outline: 2px solid var(--sage2); outline-offset: 2px; border-radius: 4px; }
 .ex-fancy { font-family: var(--font-story); font-size: 12px; color: var(--rose2); font-style: italic; margin-bottom: 2px; }
 .ex-plain { font-size: 13px; color: var(--ink); }
-.ex-how   { font-size: 10.5px; color: var(--ink3); display: block; margin-top: 3px; line-height: 1.55; }
+.ex-how   { font-size: 10.5px; color: var(--ink3); display: block; margin-top: 3px; line-height: 1.5;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.ex-meta  { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding-top: 2px; }
+.ex-meta  { display: flex; align-items: center; gap: 6px; padding-top: 2px; }
+.ex-chevron { color: var(--ink4); font-size: 16px; cursor: pointer; flex-shrink: 0; }
 
 .ex-feel { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 7px; padding-left: 42px; }
 .ex-feel-q { font-size: 10px; color: var(--ink4); font-style: italic; }
@@ -381,14 +384,15 @@ body {
 .ex-feel-btn:hover { border-color: var(--ink3); color: var(--ink); }
 .ex-feel-btn.sel { background: var(--sage3); border-color: var(--sage2); color: var(--sage2); }
 .ex-item.checked .ex-feel { opacity: 1; }
-.ex-item.ex-held .ex-content, .ex-item.ex-held .ex-meta { opacity: .45; }
-.ex-item.ex-held .ex-plain::after { content: ' · held for today'; font-size: 9px; color: var(--ink4); font-style: italic; }
-.trim-banner {
-  font-size: 11px; color: var(--sky2); background: var(--sky4); border: 1px solid var(--sky3);
-  border-radius: var(--radius); padding: 7px 10px; margin-bottom: 10px;
+.ex-item.ex-held { opacity: .48; }
+
+/* one banner component for the workout card, colour-varied */
+.wc-banner {
+  font-size: 11px; border-radius: var(--radius); padding: 7px 10px; margin-bottom: 10px;
+  color: var(--sky2); background: var(--sky4); border: 1px solid var(--sky3);
 }
-.trim-banner button { margin-left: 6px; background: none; border: none; color: var(--sky2); text-decoration: underline; cursor: pointer; font-size: 11px; }
-.exd-danger { width: 100%; margin-top: 8px; padding: 8px; background: var(--rose4); border: 1px solid var(--rose3); border-radius: var(--radius); color: var(--rose2); font-size: 11px; cursor: pointer; }
+.wc-banner.gold { color: var(--gold2); background: var(--gold4); border-color: var(--gold3); }
+.wc-banner button { margin-left: 6px; background: none; border: none; color: inherit; text-decoration: underline; cursor: pointer; font-size: 11px; }
 .goal-checkin { background: var(--dusk4); border: 1px solid var(--dusk3); border-radius: var(--radius); padding: 11px 12px; margin-bottom: 12px; }
 .goal-checkin-q { font-size: 12px; color: var(--ink2); margin-bottom: 8px; }
 .goal-checkin-opts { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -406,15 +410,8 @@ body {
 .prog-row.up .prog-what   { color: var(--sage2); }
 .prog-row.deload .prog-what { color: var(--ink3); font-style: italic; }
 .prog-empty { font-size: 11px; color: var(--ink4); font-style: italic; }
-.ex-sets  { font-size: 12px; color: var(--sage2); font-family: var(--font-mono); white-space: nowrap; }
+.ex-sets  { font-size: 12px; color: var(--sage2); font-family: var(--font-mono); text-align: right; line-height: 1.35; }
 .ex-xp    { font-size: 9px; color: var(--ink4); font-family: var(--font-mono); }
-.ex-edit-btn {
-  background: none; border: none; cursor: pointer; color: var(--ink4); font-size: 13px;
-  padding: 3px; border-radius: 6px; margin-top: 3px;
-  min-width: 26px; min-height: 26px; display: flex; align-items: center; justify-content: center;
-  transition: color .15s, background .15s; -webkit-tap-highlight-color: transparent;
-}
-.ex-edit-btn:hover { color: var(--gold2); background: var(--gold4); }
 
 .ex-edit-form { display: flex; flex-direction: column; gap: 7px; }
 .ex-edit-label { font-size: 10px; color: var(--ink3); text-transform: uppercase; letter-spacing: .05em; }
@@ -502,12 +499,6 @@ body {
 .chapter-spinner { font-size: 11px; color: var(--ink3); margin-top: 10px; }
 
 /* ── ADD / DELETE EXERCISE ───────────────────────────────────── */
-.ex-del-btn {
-  background: none; border: none; padding: 2px 4px;
-  color: var(--ink4); cursor: pointer; font-size: 13px;
-  border-radius: 4px; line-height: 1; transition: color .15s, background .15s;
-}
-.ex-del-btn:hover { color: var(--rose2); background: var(--rose3); }
 .ex-add-btn {
   width: 100%; margin-top: 8px; padding: 9px;
   background: none; border: 1px dashed var(--parch4);
@@ -784,11 +775,14 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
   color: var(--ink2); font-family: var(--font-display); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
 }
 .exd-close:hover { background: var(--parch4); }
-.ex-info-btn {
-  background: none; border: none; cursor: pointer; color: var(--ink4);
-  font-size: 15px; line-height: 1; padding: 2px;
+.exd-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.exd-act-btn {
+  width: 100%; padding: 9px; border-radius: var(--radius); cursor: pointer;
+  font-size: 12px; border: 1px solid var(--parch4); background: var(--parch2); color: var(--ink2);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-.ex-info-btn:hover { color: var(--sage2); }
+.exd-act-btn:hover { background: var(--parch3); }
+.exd-act-btn.warn { background: var(--rose4); border-color: var(--rose3); color: var(--rose2); }
 
 /* ── PASSPHRASE LOCK ─────────────────────────────────────────── */
 .lock-overlay {
@@ -1079,6 +1073,11 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 <!-- ── EXERCISE DETAIL ("study") SHEET ──────────────────────── -->
 <div class="exd-modal hidden" id="exd-modal" onclick="if(event.target===this)closeExerciseDetail()">
   <div class="exd-card" id="exd-card" role="dialog" aria-modal="true" aria-label="Exercise details"></div>
+</div>
+
+<!-- ── GENERIC PROMPT / CONFIRM SHEET ───────────────────────── -->
+<div class="exd-modal hidden" id="ui-modal" onclick="if(event.target===this)_uiClose(null)">
+  <div class="exd-card" id="ui-card" role="dialog" aria-modal="true" style="max-width:340px"></div>
 </div>
 
 <!-- ── SETUP WIZARD ─────────────────────────────────────────── -->
@@ -3423,6 +3422,48 @@ function renderStoryBtn() {
   btn.innerHTML = (hasNext ? '✦ &nbsp;Continue the story' : '✦ &nbsp;Generate the next chapter') + countNote;
 }
 
+/* ── Styled prompt / confirm sheet (replaces window.prompt/confirm) ── */
+let _uiModalResolve = () => {};
+function _uiClose(val) {
+  const m = document.getElementById('ui-modal');
+  if (m) m.classList.add('hidden');
+  const r = _uiModalResolve; _uiModalResolve = () => {};
+  r(val);
+}
+// uiPrompt returns Promise<string|null>; uiConfirm returns Promise<boolean>.
+function uiPrompt({ title, body = '', label = '', value = '', placeholder = '', cta = 'OK' }) {
+  return new Promise(resolve => {
+    _uiModalResolve = v => resolve(v);
+    const card = document.getElementById('ui-card');
+    card.innerHTML = `
+      <div class="exd-fancy" style="font-size:15px">${escHtml(title)}</div>
+      ${body ? `<div class="exd-note" style="margin-top:8px;font-style:normal;color:var(--ink2);font-size:12px">${escHtml(body)}</div>` : ''}
+      ${label ? `<div class="ex-edit-label" style="margin-top:12px">${escHtml(label)}</div>` : ''}
+      <input class="s-input" id="ui-input" value="${escHtml(value)}" placeholder="${escHtml(placeholder)}" style="margin-top:6px"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();_uiClose(document.getElementById('ui-input').value)}"/>
+      <div style="display:flex;gap:6px;margin-top:12px">
+        <button class="s-btn" style="flex:1" onclick="_uiClose(document.getElementById('ui-input').value)">${escHtml(cta)}</button>
+        <button class="s-btn" style="flex:1;background:none" onclick="_uiClose(null)">Cancel</button>
+      </div>`;
+    document.getElementById('ui-modal').classList.remove('hidden');
+    setTimeout(() => { const el = document.getElementById('ui-input'); if (el) { el.focus(); el.select(); } }, 30);
+  });
+}
+function uiConfirm({ title, body = '', cta = 'OK', danger = false }) {
+  return new Promise(resolve => {
+    _uiModalResolve = v => resolve(!!v);
+    const card = document.getElementById('ui-card');
+    card.innerHTML = `
+      <div class="exd-fancy" style="font-size:15px">${escHtml(title)}</div>
+      ${body ? `<div class="exd-note" style="margin-top:8px;font-style:normal;color:var(--ink2);font-size:12px;white-space:pre-line">${escHtml(body)}</div>` : ''}
+      <div style="display:flex;gap:6px;margin-top:14px">
+        <button class="s-btn ${danger ? 'danger' : ''}" style="flex:1" onclick="_uiClose(true)">${escHtml(cta)}</button>
+        <button class="s-btn" style="flex:1;background:none" onclick="_uiClose(false)">Cancel</button>
+      </div>`;
+    document.getElementById('ui-modal').classList.remove('hidden');
+  });
+}
+
 /* ── Exercise detail ("study") sheet ───────────────────────── */
 function closeExerciseDetail() {
   const m = document.getElementById('exd-modal');
@@ -3470,10 +3511,15 @@ async function openExerciseDetail(si, ei) {
   }
   const benched = ex.exId && isBenched(ex.exId);
   const bInfo = ex.exId && (S.benched || {})[ex.exId];
-  const actions = ex.exId ? (benched
-    ? `<div class="exd-note" style="margin-top:10px">Benched until ${escHtml(bInfo.until)}${bInfo.count > 1 ? ` · benched ${bInfo.count}× — worth getting checked` : ''}.</div>
-       <button class="exd-danger" style="background:var(--sage4);border-color:var(--sage3);color:var(--sage2)" onclick="unbenchExercise('${ex.exId}')">Bring it back now</button>`
-    : `<button class="exd-danger" onclick="hurtExercise(${si},${ei})">Something hurts — rest this movement for a while</button>`) : '';
+  const actions = `<div class="exd-actions">
+    ${ex.exId ? `<button class="exd-act-btn" onclick="closeExerciseDetail();swapExercise(${si},${ei})"><i class="ti ti-refresh"></i>Swap for a similar move</button>` : ''}
+    <button class="exd-act-btn" onclick="closeExerciseDetail();editExercise(${si},${ei})"><i class="ti ti-pencil"></i>Edit name / sets</button>
+    <button class="exd-act-btn" onclick="closeExerciseDetail();deleteExercise(${si},${ei})"><i class="ti ti-trash"></i>Remove from session</button>
+    ${ex.exId ? (benched
+      ? `<div class="exd-note" style="margin-top:2px">Rested until ${escHtml(bInfo.until)}${bInfo.count > 1 ? ` · benched ${bInfo.count}× — worth getting checked` : ''}.</div>
+         <button class="exd-act-btn" onclick="unbenchExercise('${ex.exId}')"><i class="ti ti-arrow-back-up"></i>Bring it back now</button>`
+      : `<button class="exd-act-btn warn" onclick="hurtExercise(${si},${ei})"><i class="ti ti-first-aid-kit"></i>Something hurts — rest this move</button>`) : ''}
+  </div>`;
   card.innerHTML = header + body + actions + `<button class="exd-close" onclick="closeExerciseDetail()">Close</button>`;
 }
 
@@ -3997,10 +4043,15 @@ async function hurtExercise(si, ei) {
   if (!ex.exId) { toast('Custom exercise — just delete or edit it.'); return; }
   const prevCount = ((S.benched || {})[ex.exId] || {}).count || 0;
   const ord = n => n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
-  const msg = prevCount >= 1
-    ? `"${ex.p}" again? That's the ${ord(prevCount + 1)} time.\n\nRecurring pain in the same movement is worth getting looked at — consider a physio or your doctor. It'll be swapped out and rested longer this time.`
-    : `Something hurts on "${ex.p}"?\n\nIt'll be swapped for a similar movement and rested for a couple of weeks, then restored automatically. Bring it back sooner from its info sheet any time.`;
-  if (!confirm(msg)) return;
+  const ok = await uiConfirm({
+    title: prevCount >= 1 ? `Hurts again — ${ord(prevCount + 1)} time` : 'Something hurts?',
+    body: prevCount >= 1
+      ? `Recurring pain in the same movement ("${ex.p}") is worth getting looked at — consider a physio or your doctor.\n\nIt'll be swapped out and rested longer this time.`
+      : `"${ex.p}" will be swapped for a similar movement and rested for a couple of weeks, then restored automatically. Bring it back sooner from its info sheet any time.`,
+    cta: 'Swap it out',
+    danger: true,
+  });
+  if (!ok) return;
 
   const origKey = baselineKey(ex);
   const orig = { exId: ex.exId, f: ex.f, p: ex.p, h: ex.h, muscles: (ex.muscles || []).slice(), sets: ex.sets };
@@ -4063,11 +4114,17 @@ function restoreExpiredBenches() {
 }
 
 // Per-day time budget: skip the trailing exercises to fit today's window.
-function setTodayTrim() {
+async function setTodayTrim() {
   const sess = getSessions()[curSess];
   if (!sess) return;
   const cur = estimateSessionMinutes(sess.exercises);
-  const ans = prompt(`This session is about ${cur} min. How many minutes do you have today?`, String(Math.max(10, Math.round(cur * 0.6))));
+  const ans = await uiPrompt({
+    title: 'Short on time today?',
+    body: `This session is about ${cur} min. Enter how long you have and the last exercises are held back to fit.`,
+    label: 'Minutes available',
+    value: String(Math.max(10, Math.round(cur * 0.6))),
+    cta: 'Trim',
+  });
   if (ans === null) return;
   const m = parseInt(ans, 10);
   if (!m || m < 5) { toast('Enter a number of minutes (5+).'); return; }
@@ -4096,8 +4153,7 @@ function setGoal(g) {
   S.trainingGoal = g;
   S.lastGoalCheckIn = S.lifetimeSessions || 0;
   save();
-  renderWorkoutCard();
-  if (document.getElementById('opt-workout')) renderAll();
+  renderAll();
   toast(g === 'maintain' ? 'Maintenance mode — loads will hold steady.' : 'Progressing — I\'ll nudge things up as they get easy.');
 }
 function dismissGoalCheckIn() {
@@ -4106,13 +4162,19 @@ function dismissGoalCheckIn() {
   renderWorkoutCard();
 }
 async function refocusTraining() {
-  const cur = S.trainingFocus || '';
-  const ans = prompt('New focus for your sessions?\n\ne.g. "upper body", "legs and glutes", "core and mobility", "athletic / explosive", "back to full-body"', cur);
+  const ans = await uiPrompt({
+    title: 'Switch focus',
+    body: 'e.g. upper body · legs and glutes · core and mobility · athletic / explosive · back to full-body',
+    label: 'New focus for your sessions',
+    value: S.trainingFocus || '',
+    placeholder: 'upper body',
+    cta: 'Apply',
+  });
   if (ans === null) return;
   S.trainingFocus = ans.trim();
   S.lastGoalCheckIn = S.lifetimeSessions || 0;
   save();
-  if (!getApiKey()) { toast('Focus saved — it\'ll apply next time sessions are generated.'); return; }
+  if (!getApiKey()) { toast('Focus saved — it\'ll apply next time sessions are generated.'); renderAll(); return; }
   toast('Rebuilding your sessions around that focus…');
   try { await generateSessions('fresh'); save(); renderAll(); toast('✦ Sessions refocused.'); }
   catch (e) { toast(e.message === EX_DB_ERROR ? EX_DB_ERROR : 'Could not regenerate — try again from Options.'); }
@@ -4179,6 +4241,9 @@ function renderWorkoutCard() {
               <button class="ex-save-btn" id="sm-gen-btn" onclick="generateSessMeta(${curSess})">✦ Generate exercises</button>
             </div>
           </div>
+          ${sessions.length > 1 ? `<div style="border-top:1px solid var(--parch3);margin-top:10px;padding-top:10px">
+            <button class="ex-cancel-btn" style="color:var(--rose2);border-color:var(--rose3)" onclick="deleteSession(${curSess})">🗑 Delete this day</button>
+          </div>` : ''}
         </div>`
     : `
         <div class="workout-title">${escHtml(sess.label)}</div>
@@ -4189,11 +4254,10 @@ function renderWorkoutCard() {
       <div class="workout-header-left">${headerLeft}</div>
       <div class="diff-btns" id="diff-btns-${curSess}">
         ${sessMetaEditing ? '' : `
-        <button class="diff-btn" onclick="editSessMeta(${curSess})" title="Rename this day">✎ Rename</button>
-        <button class="diff-btn" onclick="adjustDifficulty(${curSess},-1)" title="Fewer reps or easier variations">↓ Dial back</button>
-        <button class="diff-btn" onclick="adjustDifficulty(${curSess},+1)" title="More reps or harder variations">↑ Push it</button>
-        ${sessions.length > 1 ? `<button class="diff-btn" onclick="deleteSession(${curSess})" title="Delete this day">🗑 Delete</button>` : ''}
-        <button class="diff-btn" onclick="setTodayTrim()" title="Trim this session to fit the time you have today">⏱ Short on time</button>
+        <button class="diff-btn" onclick="adjustDifficulty(${curSess},-1)" title="Ease every exercise down a notch">↓ Dial back</button>
+        <button class="diff-btn" onclick="adjustDifficulty(${curSess},+1)" title="Push every exercise up a notch">↑ Push it</button>
+        <button class="diff-btn" onclick="setTodayTrim()" title="Trim this session to the time you have today">⏱ Time</button>
+        <button class="diff-btn" onclick="editSessMeta(${curSess})" title="Rename, regenerate or delete this day">✎ Day</button>
         `}
       </div>
     </div>
@@ -4206,8 +4270,11 @@ function renderWorkoutCard() {
         <button class="ghost" onclick="dismissGoalCheckIn()">Not now</button>
       </div>
     </div>` : ''}
-    ${S.trainingGoal === 'maintain' ? `<div class="trim-banner" style="color:var(--gold2);background:var(--gold4);border-color:var(--gold3)">Maintenance mode — loads holding steady. <button onclick="setGoal('build')">Resume progressing</button></div>` : ''}
-    ${held.size ? `<div class="trim-banner">Trimmed to ~${estimateSessionMinutes(sess.exercises.filter((_, i) => !held.has(i)))} min for today — ${held.size} held back. <button onclick="clearTodayTrim()">Undo</button></div>` : ''}
+    ${held.size
+      ? `<div class="wc-banner">Trimmed to ~${estimateSessionMinutes(sess.exercises.filter((_, i) => !held.has(i)))} min for today — ${held.size} held back. <button onclick="clearTodayTrim()">Undo</button></div>`
+      : (S.trainingGoal === 'maintain'
+        ? `<div class="wc-banner gold">Maintenance mode — loads holding steady. <button onclick="setGoal('build')">Resume progressing</button></div>`
+        : '')}
     <ul class="ex-list">
       ${sess.exercises.map((e, i) => {
         const key       = `${curSess}-${i}`;
@@ -4236,26 +4303,13 @@ function renderWorkoutCard() {
           <button class="ex-check-btn" onclick="toggleCheck(${curSess},${i})" aria-label="${isChecked ? 'Uncheck' : 'Check'}"${isHeld ? ' title="Held back for today — tap to do it anyway"' : ''}>
             <i class="ti ti-${isChecked ? 'circle-check-filled' : (isHeld ? 'circle-dashed' : 'circle')}"></i>
           </button>
-          <div class="ex-content" style="cursor:pointer" onclick="openExerciseDetail(${curSess},${i})" title="How to do this exercise">
+          <div class="ex-content" onclick="openExerciseDetail(${curSess},${i})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openExerciseDetail(${curSess},${i})}" role="button" tabindex="0" aria-label="${escHtml(e.p)} — how-to and options" title="Tap for how-to, swap, edit">
             <div class="ex-fancy">${escHtml(e.f)}</div>
-            <div class="ex-plain">${escHtml(e.p)}<span class="ex-how">${escHtml(withName(e.h))}</span></div>
+            <div class="ex-plain">${escHtml(e.p)}${e.h ? `<span class="ex-how">${escHtml(withName(e.h))}</span>` : ''}</div>
           </div>
           <div class="ex-meta">
             <div class="ex-sets">${escHtml(displaySetsFor(e))}</div>
-            <div style="display:flex;gap:2px">
-              <button class="ex-info-btn" onclick="openExerciseDetail(${curSess},${i})" title="How to do this exercise" aria-label="How to do this exercise">
-                <i class="ti ti-info-circle"></i>
-              </button>
-              ${e.exId ? `<button class="ex-info-btn" onclick="swapExercise(${curSess},${i})" title="Swap for a similar exercise" aria-label="Swap for a similar exercise">
-                <i class="ti ti-refresh"></i>
-              </button>` : ''}
-              <button class="ex-edit-btn" onclick="editExercise(${curSess},${i})" title="Edit">
-                <i class="ti ti-pencil"></i>
-              </button>
-              <button class="ex-del-btn" onclick="deleteExercise(${curSess},${i})" title="Delete">
-                <i class="ti ti-trash"></i>
-              </button>
-            </div>
+            <i class="ti ti-chevron-right ex-chevron" onclick="openExerciseDetail(${curSess},${i})"></i>
           </div>
           ${isChecked ? `<div class="ex-feel" role="group" aria-label="How did that feel?">
             <span class="ex-feel-q">How did that feel?</span>
@@ -4334,8 +4388,10 @@ function renderProgressionLog() {
   // group by exercise key, most-recently-changed first
   const byKey = {};
   for (const e of log) (byKey[e.key] = byKey[e.key] || []).push(e);
-  const groups = Object.values(byKey).sort((a, b) =>
+  const allGroups = Object.values(byKey).sort((a, b) =>
     (b[b.length - 1].date).localeCompare(a[a.length - 1].date));
+  const CAP = 8;
+  const groups = _progLogAll ? allGroups : allGroups.slice(0, CAP);
   const fmt = ds => { const [y, m, d] = ds.split('-'); return `${+m}/${+d}`; };
   const verb = { reps: 'reps up', time: 'longer hold', load: 'load up', sets: 'added a set', deload: 'eased back', start: 'starting point' };
   el.innerHTML = groups.map(rows => `
@@ -4346,8 +4402,11 @@ function renderProgressionLog() {
           <span class="prog-when">${fmt(r.date)}</span>
           <span class="prog-what">${escHtml(verb[r.change] || r.change)} — ${r.from ? escHtml(r.from) + ' → ' : ''}<strong>${escHtml(r.to || '')}</strong>${r.trigger && r.trigger.indexOf('estimated') === 0 ? ' <em style="opacity:.7">(estimated)</em>' : ''}</span>
         </div>`).join('')}
-    </div>`).join('');
+    </div>`).join('')
+    + (allGroups.length > CAP && !_progLogAll
+      ? `<button class="ex-add-btn" onclick="_progLogAll=true;renderProgressionLog()">Show all ${allGroups.length} exercises</button>` : '');
 }
+let _progLogAll = false;
 
 /* ── Loot tab ───────────────────────────────────────────────── */
 const LOOT_CAT_LABELS = {
