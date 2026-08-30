@@ -1942,23 +1942,9 @@ function estimateSessionMinutes(exercises) {
   }
   return Math.max(5, Math.round(sec / 60));
 }
-// Replace a leading "~NN min ·" in a stored sub with the freshly computed estimate.
-function subWithHonestTime(sess) {
-  const mins = estimateSessionMinutes(sess.exercises);
-  const rest = sessionDescOnly(sess);
-  return rest ? `~${mins} min · ${rest}` : `~${mins} min`;
-}
 // Just the description part of a stored sub, with any leading "~NN min ·" removed.
 function sessionDescOnly(sess) {
   return String(sess.sub || '').replace(/^\s*~?\s*\d+\s*min\s*(?:·|-|—)?\s*/i, '').trim();
-}
-// The working-set budget for a session, derived from the length the USER chose
-// (S.prefs.sessionLength). This is what the generator is told to stay under.
-function userSessionMinutes() { return Number((S.prefs || {}).sessionLength) || 20; }
-function targetSetBudget(mins) {
-  const m = Number(mins) || 20;
-  const mid = Math.max(4, (m * 60 - SESSION_OVERHEAD_SEC) / secondsPerSet());
-  return { mins: m, lo: Math.max(5, Math.round(mid * 0.85)), hi: Math.max(7, Math.round(mid * 1.15)) };
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -2220,7 +2206,7 @@ function parseSetsSpec(setsStr) {
 }
 
 // One step up on a baseline (reps → then load / added set / longer hold).
-function _advanceNotch(b, ex, doLog) {
+function _advanceNotch(b, ex, doLog, trigger) {
   const from = displaySetsFor(ex);
   let change;
   if (b.targetReps < b.repRange[1]) {
@@ -2235,7 +2221,7 @@ function _advanceNotch(b, ex, doLog) {
     b.targetReps = b.repRange[0];
     change = 'sets';
   }
-  if (doLog) logProgression(ex, change, from, displaySetsFor(ex), 'two easy sessions');
+  if (doLog) logProgression(ex, change, from, displaySetsFor(ex), trigger || 'two easy sessions');
 }
 
 // One step down (mirror of _advanceNotch) — for deloads and post-layoff regression.
@@ -2267,9 +2253,7 @@ function maybeRegressAfterGap() {
   let n = 0;
   for (const key of Object.keys(S.baselines)) {
     const b = S.baselines[key];
-    const netUps = (S.progressionLog || []).filter(e => e.key === key && e.change !== 'deload' && e.change !== 'start').length
-                 - (S.progressionLog || []).filter(e => e.key === key && e.change === 'deload').length;
-    if (netUps <= 0) continue;   // nothing to shake off
+    if (_netNotches(key) <= 0) continue;   // nothing to shake off
     if (_deloadNotch(b, { exId: key.indexOf('name:') === 0 ? null : key, p: key.replace(/^name:/, '') }, `back after ${gap} days off`)) n++;
   }
   if (n) {
@@ -2383,12 +2367,7 @@ function applyFeel(ex, feel) {
   }
   if (b.struggleStreak >= STRUGGLE_STREAK_TO_DELOAD) {
     b.struggleStreak = 0;
-    const from = displaySetsFor(ex);
-    if (b.kind === 'load' && b.load > 0) b.load = Math.max(0, Math.round((b.load * 0.9) / 2.5) * 2.5);
-    else if (b.sets > 2) b.sets -= 1;
-    else b.targetReps = Math.max(b.repRange[0], b.targetReps - (b.kind === 'timed' ? 5 : 2));
-    logProgression(ex, 'deload', from, displaySetsFor(ex), 'two tough sessions');
-    return 'down';
+    return _deloadNotch(b, ex, 'two tough sessions') ? 'down' : null;
   }
   return null;
 }
@@ -3324,6 +3303,7 @@ function checkStreak() {
   if (isPaused()) return;
   if (effectiveGapDays() > 1) S.curStreak = 0;
   maybeRegressAfterGap();
+  restoreExpiredBenches();
 }
 
 
@@ -3723,17 +3703,6 @@ function parseJsonLoose(raw, kind) {
   catch { return JSON.parse(sanitizeJsonControlChars(clean)); }
 }
 
-function normalizeGeneratedExercises(list) {
-  const exercises = (Array.isArray(list) ? list : []).map(e => ({
-    f:    String(e.f || e.p || 'Exercise'),
-    p:    String(e.p || e.f || 'Exercise'),
-    h:    String(e.h || ''),
-    sets: String(e.sets || '3 × 10'),
-    xp:   typeof e.xp === 'number' ? e.xp : 15,
-  }));
-  return exercises.length ? exercises : [{ f: 'Exercise', p: 'Exercise', h: '', sets: '3 × 10', xp: 15 }];
-}
-
 // Generates label/sub/exercises for ONE session from a free-text description.
 // Exercises are chosen from the real exercise DB — the AI only picks ids + names.
 async function generateSessionPlan(dayName, description) {
@@ -3952,56 +3921,25 @@ function closeDiffNudge() {
   if (el) { el.classList.add('hidden'); }
 }
 
-async function adjustDifficulty(si, direction) {
+// Manual one-tap nudge to every exercise in a session — same notch machinery as
+// the automatic feel-based progression, so exId / muscles / tracking stay intact.
+function adjustDifficulty(si, direction) {
   const now = Date.now();
   _diffPressLog = _diffPressLog.filter(t => now - t < 3 * 60 * 1000);
   _diffPressLog.push(now);
   if (_diffPressLog.length >= 3) showDiffNudge();
 
-  const sessions = getSessions();
-  const sess = sessions[si];
+  ensureCustomSessions();
+  const sess = S.customSessions[si];
   if (!sess) return;
-
-  const btnsEl = document.getElementById('diff-btns-' + si);
-  if (btnsEl) {
-    btnsEl.innerHTML = `<span class="diff-adjusting">Adjusting…</span>`;
+  for (const ex of sess.exercises) {
+    const b = ensureBaseline(ex);
+    if (direction < 0) _deloadNotch(b, ex, 'dialed back');
+    else _advanceNotch(b, ex, true, 'pushed up');
   }
-
-  const dirWord = direction < 0 ? 'easier' : 'harder';
-  const dirDesc = direction < 0
-    ? 'fewer sets or reps, or simpler variations — should feel lighter and more accessible'
-    : 'more sets or reps, or slightly harder progressions — meaningfully more challenging';
-
-  const genre = (S.prefs || {}).genre || 'fantasy';
-  const exList = sess.exercises.map(e => `- ${e.p}: ${e.sets}`).join('\n');
-  const prompt = `These are exercises in a workout session:\n${exList}\n\nRewrite them to be ${dirWord}: ${dirDesc}. Keep the same number of exercises and the same movement patterns — just adjust the load. Also give each one a fitting ${genre}-themed fantasy name.\n\nReturn a raw JSON array only, no markdown fences:\n[{"f":"fantasy name","p":"plain name","h":"brief how-to","sets":"e.g. 2 × 8","xp":15}, …]`;
-
-  try {
-    const raw = await callApi([{ role: 'user', content: prompt }], { maxTokens: 1200 });
-    let arr;
-    try {
-      const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-      const clean = fenced ? fenced[1].trim() : (raw.match(/\[[\s\S]*\]/) || [raw])[0];
-      arr = JSON.parse(clean);
-    } catch (_) {
-      toast('Could not parse the adjustment — try again.');
-      renderWorkoutCard();
-      return;
-    }
-    if (!Array.isArray(arr) || arr.length === 0) { toast('Adjustment came back empty — try again.'); renderWorkoutCard(); return; }
-    ensureCustomSessions();
-    const sessionXP = S.customSessions[si].xp || 90;
-    const rawExs    = arr.map(e => ({ f: e.f || e.p, p: e.p, h: e.h || '', sets: e.sets || '3 × 10', xp: e.xp || 15 }));
-    const n    = rawExs.length;
-    const base = n > 0 ? Math.floor(sessionXP / n) : 15;
-    const extra = n > 0 ? sessionXP - base * n : 0;
-    S.customSessions[si].exercises = rawExs.map((e, j) => ({ ...e, xp: base + (j === 0 ? extra : 0) }));
-    save();
-    toast(direction < 0 ? 'Dialed back — take it at your pace.' : 'Pushed up — go get it.');
-  } catch (err) {
-    toast('Something went wrong. Try again.');
-  }
+  save();
   renderWorkoutCard();
+  toast(direction < 0 ? 'Dialed back a notch — take it at your pace.' : 'Pushed up a notch — go get it.');
 }
 
 function addExercise(si) {
@@ -4045,34 +3983,83 @@ async function swapExercise(si, ei, opts = {}) {
   _carryBaseline(oldKey, baselineKey(ex));
   save();
   renderWorkoutCard();
-  toast(opts.silent ? '' : `Swapped in ${pick.name} — your progress carried over.`);
+  if (!opts.silent) toast(`Swapped in ${pick.name} — your progress carried over.`);
+  return pick.id;
 }
 
-// "Something hurts" — bench a movement for a couple of weeks, then it returns.
+// "Something hurts" — swap the movement out, rest it for ~18 days (longer if it
+// keeps happening), then restore it automatically. "Bring it back now" ends the
+// rest early. Repeated benching of the same movement flags it for the user.
 async function hurtExercise(si, ei) {
   const sess = getSessions()[si];
   const ex = sess && sess.exercises[ei];
   if (!ex) return;
   if (!ex.exId) { toast('Custom exercise — just delete or edit it.'); return; }
   const prevCount = ((S.benched || {})[ex.exId] || {}).count || 0;
-  const recurring = prevCount >= 1;
-  const msg = recurring
-    ? `"${ex.p}" again? That's the ${prevCount + 1}${prevCount + 1 === 2 ? 'nd' : prevCount + 1 === 3 ? 'rd' : 'th'} time.\n\nRecurring pain in the same movement is worth getting looked at — consider a physio or your doctor. It'll be swapped out and rested longer this time.`
-    : `Something hurts on "${ex.p}"?\n\nIt'll be swapped for a similar movement and rested for a couple of weeks, then it comes back automatically. Bring it back sooner from its info sheet any time.`;
+  const ord = n => n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
+  const msg = prevCount >= 1
+    ? `"${ex.p}" again? That's the ${ord(prevCount + 1)} time.\n\nRecurring pain in the same movement is worth getting looked at — consider a physio or your doctor. It'll be swapped out and rested longer this time.`
+    : `Something hurts on "${ex.p}"?\n\nIt'll be swapped for a similar movement and rested for a couple of weeks, then restored automatically. Bring it back sooner from its info sheet any time.`;
   if (!confirm(msg)) return;
+
+  const origKey = baselineKey(ex);
+  const orig = { exId: ex.exId, f: ex.f, p: ex.p, h: ex.h, muscles: (ex.muscles || []).slice(), sets: ex.sets };
   const { count, days } = benchExercise(ex.exId, ex.p);
   closeExerciseDetail();
-  await swapExercise(si, ei, { silent: true });
+  const newExId = await swapExercise(si, ei, { silent: true });
+  // record what to restore, and where to find the replacement
+  S.benched[orig.exId].orig = orig;
+  S.benched[orig.exId].origKey = origKey;
+  S.benched[orig.exId].replacedBy = newExId || null;
+  save();
   toast(count >= 2
-    ? `Benched "${ex.p}" for ${days} days. Please get that checked if it keeps up.`
-    : `Benched "${ex.p}" for ${days} days — it'll return on its own. Take it easy.`);
+    ? `Benched "${orig.p}" for ${days} days. Please get that checked if it keeps up.`
+    : `Benched "${orig.p}" for ${days} days. Take it easy.`);
 }
+
+// Put a benched exercise's original movement back where its replacement now sits.
+// Returns true if it found and restored the slot.
+function _restoreBenched(exId) {
+  const info = (S.benched || {})[exId];
+  let restored = false;
+  if (info && info.orig && info.replacedBy) {
+    outer:
+    for (const sess of (S.customSessions || [])) {
+      for (const slot of sess.exercises) {
+        if (slot.exId === info.replacedBy) {
+          const replKey = baselineKey(slot);
+          slot.exId = info.orig.exId; slot.f = info.orig.f; slot.p = info.orig.p;
+          slot.h = info.orig.h; slot.muscles = (info.orig.muscles || []).slice(); slot.sets = info.orig.sets;
+          _carryBaseline(replKey, baselineKey(slot));
+          restored = true;
+          break outer;
+        }
+      }
+    }
+  }
+  if (info) { delete info.orig; delete info.replacedBy; delete info.origKey; }
+  return restored;
+}
+
 function unbenchExercise(exId) {
   unbench(exId);
+  _restoreBenched(exId);
   save();
   closeExerciseDetail();
   renderWorkoutCard();
   toast('Back in rotation — ease into it and see how it feels.');
+}
+
+// When a bench period lapses, quietly restore the original movement.
+function restoreExpiredBenches() {
+  let any = false;
+  for (const exId of Object.keys(S.benched || {})) {
+    const info = S.benched[exId];
+    if (info && info.orig && info.until && info.until < today()) {
+      if (_restoreBenched(exId)) { any = true; toast(`"${info.name}" is back in your routine — ease into it.`); }
+    }
+  }
+  if (any) save();
 }
 
 // Per-day time budget: skip the trailing exercises to fit today's window.
@@ -5374,12 +5361,6 @@ function sToggleEquip(btn) {
   btn.classList.toggle('sel', arr.includes(val));
   save();
 }
-function equipmentDesc(equipment) {
-  if (!Array.isArray(equipment) || !equipment.length) return 'bodyweight only';
-  if (equipment.includes('gym')) return 'full gym (barbells, cables, machines, dumbbells, kettlebells, etc.)';
-  return 'bodyweight, ' + equipment.map(e => EQUIP_LABELS[e] || e).join(', ');
-}
-
 function wSetProvider(val, btn) {
   localStorage.setItem('kat_api_provider', val);
   btn.closest('.provider-toggle').querySelectorAll('.prov-btn').forEach(b => b.classList.remove('active'));
