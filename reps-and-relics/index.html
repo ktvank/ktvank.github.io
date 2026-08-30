@@ -5900,7 +5900,8 @@ function getUnlockedCompanions() {
 function renderCompanionsPanel() {
   const grid = document.getElementById('companions-grid');
   if (!grid) return;
-  const heroIcon = { fantasy: '⚔️', scifi: '🚀', mystery: '🔍', cozy: '🌿' }[(S.prefs || {}).genre] || '⚔️';
+  const _hp = S.prefs || {};
+  const heroIcon = getClassData(_hp.genre, _hp.heroClass).icon;
   const heroCard = `
     <div class="companion-card hero-card" onclick="showHeroQuip()">
       <div class="companion-card-top">
