@@ -5940,6 +5940,17 @@ const PORTRAIT_STYLE = {
   cozy:    'soft storybook character portrait, gentle daylight, warm pastels, head and shoulders, plain cream background',
   anime:   'clean anime character portrait, cel shading, bright saturated palette, head and shoulders, plain gradient background',
 };
+const PORTRAIT_TONE = {
+  humorous: 'characterful, lively, slightly exaggerated features',
+  dramatic: 'high contrast, cinematic, intense mood',
+  gentle:   'soft light, warm and calm, approachable',
+};
+function _portraitStyle() {
+  const p = S.prefs || {};
+  const base = PORTRAIT_STYLE[p.genre] || PORTRAIT_STYLE.fantasy;
+  const tone = PORTRAIT_TONE[p.tone] || PORTRAIT_TONE.humorous;
+  return `${base}, ${tone}`;
+}
 function portraitsOn() { return (S.prefs || {}).portraits !== false; }
 function _seed(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h) % 100000; }
 function _pollUrl(prompt, seed) {
@@ -5964,12 +5975,11 @@ function heroPortraitPrompt() {
   const pr = heroPronouns();
   const gender = pr.sub === 'he' ? 'man' : pr.sub === 'she' ? 'woman' : 'person';
   const persona = (p.personalityNote || '').replace(/[^\w ,'-]/g, '').slice(0, 70);
-  return `${PORTRAIT_STYLE[p.genre] || PORTRAIT_STYLE.fantasy}. A ${gender}, a ${String(cls.label).toLowerCase()} — ${cls.desc}${persona ? '. ' + persona : ''}. Resolute expression, facing the viewer.`;
+  return `${_portraitStyle()}. A ${gender}, a ${String(cls.label).toLowerCase()} — ${cls.desc}${persona ? '. ' + persona : ''}. Facing the viewer.`;
 }
 function companionPortraitPrompt(c) {
-  const g = (S.prefs || {}).genre || 'fantasy';
   const look = (c.appearance || c.profile || c.name).replace(/[^\w ,'.-]/g, '').slice(0, 240);
-  return `${PORTRAIT_STYLE[g] || PORTRAIT_STYLE.fantasy}. ${look}. Facing the viewer.`;
+  return `${_portraitStyle()}. ${look}. Facing the viewer.`;
 }
 const _portraitBusy = new Set();
 async function ensureHeroPortrait() {
