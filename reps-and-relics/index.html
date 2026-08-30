@@ -118,10 +118,27 @@ body[data-genre="cozy"] {
       rgba(200,112,144,.03) 28px, rgba(200,112,144,.03) 29px);
 }
 
+body[data-genre="anime"] {
+  --parch:  #f4f7ff; --parch2: #e9f0ff; --parch3: #dbe6ff; --parch4: #c3d4f5;
+  --ink:    #16203a; --ink2:   #35406a; --ink3:   #6b78a0; --ink4:   #9aa6c8;
+  --sage:   #3b6bff; --sage2:  #2748d8; --sage3:  #dbe4ff; --sage4:  #eef2ff;
+  --rose:   #ff5a3c; --rose2:  #d8371c; --rose3:  #ffe0d8; --rose4:  #fff2ee;
+  --sky:    #17b7e6; --sky2:   #0d8fbc; --sky3:   #d4f0fb; --sky4:   #eefaff;
+  --gold:   #ff9f1c; --gold2:  #d97a00; --gold3:  #ffe9cc; --gold4:  #fff6e9;
+  --dusk:   #8b5cf6; --dusk2:  #6b32e0; --dusk3:  #ebe2ff; --dusk4:  #f6f2ff;
+  --shadow:    0 3px 16px rgba(59,107,255,.18);
+  --shadow-sm: 0 1px 5px  rgba(59,107,255,.12);
+  background-image:
+    radial-gradient(ellipse at 50% -10%, rgba(59,107,255,.10) 0%, transparent 55%),
+    repeating-linear-gradient(115deg, transparent, transparent 34px,
+      rgba(255,90,60,.04) 34px, rgba(255,90,60,.04) 36px);
+}
+
 /* ── DARK MODE ─────────────────────────────────────────────────── */
-/* Only overrides the light-themed genres (fantasy, cozy); scifi & mystery are already dark */
+/* Only overrides the light-themed genres (fantasy, cozy, anime); scifi & mystery are already dark */
 body[data-dark="true"][data-genre="fantasy"],
 body[data-dark="true"]:not([data-genre]),
+body[data-dark="true"][data-genre="anime"],
 body[data-dark="true"][data-genre="cozy"] {
   --parch:  #18181f; --parch2: #1f1f29; --parch3: #28283a; --parch4: #353550;
   --ink:    #e4dfd6; --ink2:   #c0bbb0; --ink3:   #807a6e; --ink4:   #4a4640;
@@ -1541,7 +1558,7 @@ const _ARCS = [
   { id:"a5", s:[126,180] },
   { id:"a6", s:[181,9999]},
 ];
-const ADVENTURES = { fantasy: _ARCS, scifi: _ARCS, mystery: _ARCS, cozy: _ARCS };
+const ADVENTURES = { fantasy: _ARCS, scifi: _ARCS, mystery: _ARCS, cozy: _ARCS, anime: _ARCS };
 
 function getClassData(genre, heroClassId) {
   const classes = CLASSES[genre] || CLASSES.fantasy;
@@ -1813,6 +1830,13 @@ const CLASSES = {
     { id:'gardener',  icon:'🌱', label:'Gardener',  desc:'Patience and growth. Tends what matters.'   },
     { id:'innkeeper', icon:'🏠', label:'Innkeeper', desc:'Host to all. Stories begin at the bar.'     },
     { id:'herbalist', icon:'🌿', label:'Herbalist', desc:'Old remedies, older knowledge. Heals quietly.' },
+  ],
+  anime: [
+    { id:'fighter', icon:'👊', label:'Fighter',     desc:'Trades power for grit. Gets back up every time.'       },
+    { id:'blade',   icon:'🗡️', label:'Blade',       desc:'Speed and precision. One clean motion.'                },
+    { id:'caster',  icon:'✨', label:'Caster',      desc:'Channels something vast. Control is the real training.' },
+    { id:'guard',   icon:'🛡️', label:'Guardian',   desc:'Takes the hit so others don\'t. Immovable.'            },
+    { id:'mender',  icon:'💠', label:'Mender',      desc:'Keeps the party standing. Strength that serves.'       },
   ],
 };
 
@@ -2428,6 +2452,26 @@ const REMINDERS = {
       "There's no hurry. {name} can go at {sub}'s own pace. It always feels good to come back.",
     ],
   },
+  anime: {
+    humorous: [
+      "The System has logged {name}'s streak as 'pending'. {name} would like it to stop doing that.",
+      "{name}'s rival trained today. {name} knows this. The universe made sure of it.",
+      "Daily quest: incomplete. {name} is choosing to treat that as a suggestion. For now.",
+      "{name} has been meaning to grind. The grind, patiently, has been meaning to be ground.",
+    ],
+    dramatic: [
+      "The gate won't wait for {name} to feel ready. Nothing worth clearing ever does.",
+      "Somewhere the rankings updated without {name} in them. {sub} felt it.",
+      "Power left unused is just potential. {name} knows the difference by now.",
+      "{name} made a promise at the bottom of the board. The board hasn't forgotten.",
+    ],
+    gentle: [
+      "No rush. Even S-rank hunters take rest days. {name} has earned this one.",
+      "The training hall keeps its doors open. {name} can walk back in whenever.",
+      "Progress held is not progress lost. {name} knows the way back.",
+      "{name} can start again small. That's how {sub} started the first time.",
+    ],
+  },
 };
 
 /* ════════════════════════════════════════════════════════════════
@@ -2538,6 +2582,32 @@ const STORY_SEEDS = {
       'light through old curtains on a quiet morning',
       'wood worn smooth by a great many careful hands',
       'the smell of something baking with no particular occasion',
+    ],
+  },
+  anime: {
+    complications: [
+      'a low-rank gate opens where none should be',
+      'the guild posts a request no one else will take',
+      'a rival turns up already three ranks ahead',
+      'the System flags an anomaly in the daily quest',
+      'a mentor asks a question instead of giving an answer',
+      'a dungeon break scatters something that should have stayed contained',
+      'an appraisal comes back with a result that makes people quiet',
+    ],
+    motifs: [
+      'power that means nothing without the will to use it well',
+      'the gap between talent and the work that closes it',
+      'a rivalry that is really two people pushing each other upward',
+      'strength measured by who you can carry, not who you can beat',
+      'the drill everyone skips turning out to be the one that matters',
+      'a promise made at the bottom of the rankings',
+    ],
+    flavors: [
+      'the blue shimmer of a gate at the edge of town',
+      'a status window only you can see, blinking for attention',
+      'chalk dust and floor mats in an empty training hall at dawn',
+      'the guild board thick with overlapping paper',
+      'the hum just before a technique lands',
     ],
   },
 };
@@ -3484,6 +3554,7 @@ const GENRE_EXERCISE_STYLE = {
   scifi:   'sci-fi (technical, futuristic, e.g. "Gravitational Resistance Protocol")',
   mystery: 'noir mystery (shadowy, investigative, e.g. "The Crouching Surveillance Position")',
   cozy:    'cosy (warm, gentle, e.g. "The Morning Garden Stretch")',
+  anime:   'shōnen anime (dramatic named techniques, e.g. "Rooted Titan Stance", "Rank-E Reinforcement Drill")',
 };
 function exerciseNameStyle() {
   const genre = (S.prefs || {}).genre || 'fantasy';
@@ -4023,6 +4094,7 @@ const LOOT_CAT_LABELS = {
   scifi:   { weapon:'Weapons', garment:'Suits',    tome:'Datapads',  artifact:'Devices'   },
   mystery: { weapon:'Weapons', garment:'Clothing', tome:'Dossiers',  artifact:'Relics'    },
   cozy:    { weapon:'Tools',   garment:'Clothing', tome:'Books',     artifact:'Keepsakes' },
+  anime:   { weapon:'Weapons', garment:'Gear',     tome:'Manuals',   artifact:'Relics'    },
 };
 
 function renderLootFilters() {
@@ -4242,7 +4314,7 @@ async function completeSession(i) {
   // Strength milestones — fanfare for going up, no shaming for easing back.
   if (advanced.length) {
     setTimeout(() => {
-      playSound('levelup');
+      playSound('progress');
       toast(`💪 Stronger — ${advanced.slice(0, 2).join(' & ')}${advanced.length > 2 ? ` +${advanced.length - 2}` : ''} moved up a notch`);
     }, 900);
   } else if (anyDeload) {
@@ -4310,6 +4382,7 @@ const NARR_GENRES = [
   { v: 'scifi',   label: 'Sci-fi' },
   { v: 'mystery', label: 'Mystery' },
   { v: 'cozy',    label: 'Cozy' },
+  { v: 'anime',   label: 'Anime' },
 ];
 const NARR_TONES = [
   { v: 'humorous', label: 'Humorous' },
@@ -4897,7 +4970,7 @@ const WIZARD_STEPS = [
     html: () => `
       <label class="wizard-field-label">Genre</label>
       <div class="wizard-opt-group">
-        ${[['fantasy','🧙 Fantasy — magic, swords, ancient tomes'],['scifi','🚀 Sci-Fi — starships, tech, the void'],['mystery','🔍 Mystery — shadows, clues, hidden truths'],['cozy','☕ Cozy — gentle, warm, no dramatic stakes']].map(([v,l])=>`<button class="wizard-opt ${wPrefs.genre===v?'sel':''}" onclick="wSet('genre','${v}',this)">${l}</button>`).join('')}
+        ${[['fantasy','🧙 Fantasy — magic, swords, ancient tomes'],['scifi','🚀 Sci-Fi — starships, tech, the void'],['mystery','🔍 Mystery — shadows, clues, hidden truths'],['cozy','☕ Cozy — gentle, warm, no dramatic stakes'],['anime','⚡ Anime — guilds, gates, awakened power, rivals']].map(([v,l])=>`<button class="wizard-opt ${wPrefs.genre===v?'sel':''}" onclick="wSet('genre','${v}',this)">${l}</button>`).join('')}
       </div>
       <label class="wizard-field-label" style="margin-top:14px">Tone</label>
       <div class="wizard-opt-row">
@@ -5253,6 +5326,7 @@ async function generateLootAndBadges(p) {
     scifi:   'sci-fi — technological equipment with futuristic designations',
     mystery: 'noir mystery — shadowy artefacts with investigative flavour',
     cozy:    'cosy — warm, gentle everyday items with charming names',
+    anime:   'shōnen anime — guild-issued gear, awakened relics, rank insignia, training weights',
   };
   const toneGuide = { humorous:'warm, wry, Pratchett-ish — quietly fond', dramatic:'weighty, earnest', gentle:'encouraging, soft' };
 
@@ -5333,6 +5407,7 @@ async function checkAndTopUp() {
       scifi:   'sci-fi — technological equipment with futuristic designations',
       mystery: 'noir mystery — shadowy artefacts with investigative flavour',
       cozy:    'cosy — warm, gentle everyday items with charming names',
+      anime:   'shōnen anime — guild-issued gear, awakened relics, rank insignia, training weights',
     };
     const toneGuide = { humorous:'warm, wry, Pratchett-ish', dramatic:'weighty, earnest', gentle:'encouraging, soft' };
 
@@ -5938,12 +6013,12 @@ function _getAC() {
   }
   return _ac;
 }
-function _beep(ac, hz, start, dur, vol) {
+function _beep(ac, hz, start, dur, vol, wave) {
   try {
     const osc = ac.createOscillator();
     const env = ac.createGain();
     osc.connect(env); env.connect(ac.destination);
-    osc.type = 'sine';
+    osc.type = wave || 'sine';
     osc.frequency.value = hz;
     env.gain.setValueAtTime(0, start);
     env.gain.linearRampToValueAtTime(vol, start + 0.008);
@@ -5952,24 +6027,52 @@ function _beep(ac, hz, start, dur, vol) {
     osc.stop(start + dur + 0.1);
   } catch(e) {}
 }
+
+/* Per-genre voice for the synth. Each event is [dt, hz, dur] triples; `detune`
+   layers a second osc a few cents off for a fuller/eerier body. Tone scales
+   volume and tempo (gentle softer+slower, dramatic bigger). */
+const SOUND_THEMES = {
+  fantasy: { wave: 'sine', gain: 1,
+    tick:     [[0, 880, 0.10]],
+    complete: [[0, 523, 0.26], [0.14, 659, 0.26], [0.28, 784, 0.42]],
+    levelup:  [[0, 392, 0.16], [0.12, 523, 0.16], [0.24, 659, 0.16], [0.36, 784, 0.5], [0.36, 988, 0.5]] },
+  scifi: { wave: 'sawtooth', gain: 0.8, detune: 6,
+    tick:     [[0, 1320, 0.06]],
+    complete: [[0, 440, 0.2], [0.1, 660, 0.2], [0.2, 880, 0.34]],
+    levelup:  [[0, 330, 0.14], [0.1, 494, 0.14], [0.2, 740, 0.14], [0.32, 988, 0.5], [0.32, 1319, 0.5]] },
+  mystery: { wave: 'triangle', gain: 0.85,
+    tick:     [[0, 660, 0.09]],
+    complete: [[0, 466, 0.28], [0.16, 622, 0.28], [0.32, 740, 0.44]],   // minor
+    levelup:  [[0, 349, 0.18], [0.14, 466, 0.18], [0.28, 622, 0.18], [0.42, 831, 0.55]] },
+  cozy: { wave: 'sine', gain: 0.7,
+    tick:     [[0, 784, 0.12]],
+    complete: [[0, 523, 0.34], [0.2, 659, 0.34], [0.4, 880, 0.5]],
+    levelup:  [[0, 523, 0.22], [0.18, 659, 0.22], [0.36, 784, 0.22], [0.54, 1047, 0.6]] },
+  anime: { wave: 'square', gain: 0.9, detune: 4,
+    tick:     [[0, 1046, 0.06]],
+    complete: [[0, 523, 0.16], [0.09, 659, 0.16], [0.18, 784, 0.16], [0.27, 1047, 0.34]],
+    levelup:  [[0, 392, 0.1], [0.08, 523, 0.1], [0.16, 659, 0.1], [0.24, 784, 0.1], [0.32, 1047, 0.14], [0.42, 1319, 0.6], [0.42, 1568, 0.6]] },
+};
+const TONE_SOUND = { humorous: { v: 1, t: 1 }, dramatic: { v: 1.18, t: 1.05 }, gentle: { v: 0.72, t: 1.25 } };
+
 async function playSound(name) {
   if (localStorage.getItem('kat_sound_off') === '1') return;
   try {
     const ac = _getAC();
     if (!ac) return;
     if (ac.state === 'suspended') await ac.resume();
-    const t = ac.currentTime + 0.01;
-    if (name === 'tick') {
-      _beep(ac, 880, t, 0.10, 0.18);
-    } else if (name === 'complete') {
-      [[0, 523, 0.28], [0.15, 659, 0.28], [0.30, 784, 0.45]].forEach(([dt, hz, d]) =>
-        _beep(ac, hz, t + dt, d, 0.22)
-      );
-    } else if (name === 'levelup') {
-      [[0, 392, 0.16], [0.12, 523, 0.16], [0.24, 659, 0.16], [0.36, 784, 0.55], [0.36, 988, 0.55]].forEach(([dt, hz, d]) =>
-        _beep(ac, hz, t + dt, d, 0.18)
-      );
-    }
+    const t0 = ac.currentTime + 0.01;
+    const prefs = S.prefs || {};
+    const theme = SOUND_THEMES[prefs.genre] || SOUND_THEMES.fantasy;
+    const tone  = TONE_SOUND[prefs.tone] || TONE_SOUND.humorous;
+    // 'progress' (the strength-milestone fanfare) reuses the levelup motif.
+    const seq = theme[name === 'progress' ? 'levelup' : name];
+    if (!seq) return;
+    const baseVol = 0.2 * (theme.gain || 1) * tone.v;
+    seq.forEach(([dt, hz, dur]) => {
+      _beep(ac, hz, t0 + dt * tone.t, dur * tone.t, baseVol, theme.wave);
+      if (theme.detune) _beep(ac, hz * (1 + theme.detune / 1200), t0 + dt * tone.t, dur * tone.t, baseVol * 0.6, theme.wave);
+    });
   } catch(e) {}
 }
 async function toggleSound(btn) {
