@@ -936,8 +936,8 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
   transition: top .22s ease, left .22s ease;
 }
 
-/* ── HOARD › CAST SUB-TAB ────────────────────────────────────── */
-#hoard-cast { padding-top: 2px; }
+/* ── TROVE › CAST SUB-TAB ────────────────────────────────────── */
+#trove-cast { padding-top: 2px; }
 
 .companion-unlock-banner {
   padding: 10px 14px; margin-bottom: 12px;
@@ -1130,7 +1130,7 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
   <button class="nav-btn active" onclick="go('quest',this)">  <i class="ti ti-wand"></i>    Quest</button>
   <button class="nav-btn"        onclick="go('train',this)">  <i class="ti ti-barbell"></i>  Train</button>
   <button class="nav-btn"        onclick="go('streak',this)"> <i class="ti ti-flame"></i>    Streak</button>
-  <button class="nav-btn"        onclick="go('hoard',this)">  <i class="ti ti-sparkles"></i> Hoard</button>
+  <button class="nav-btn" id="nav-trove" onclick="go('trove',this)"><i class="ti ti-sparkles"></i> <span id="nav-trove-label">Trove</span></button>
   <button class="nav-btn"        onclick="go('settings',this)"><i class="ti ti-settings"></i>Options</button>
 </nav>
 
@@ -1221,16 +1221,16 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 </div><!-- /streak -->
 
 <!-- ══════════════════════════════════════════════════════════ -->
-<!-- HOARD TAB  (Loot · Badges · Cast)                          -->
+<!-- TROVE TAB  (Loot · Badges · Cast) — nav label is genre-themed -->
 <!-- ══════════════════════════════════════════════════════════ -->
-<div class="panel" id="hoard">
+<div class="panel" id="trove">
   <div class="opt-tabs">
-    <button class="opt-tab active" id="hoard-tab-loot"   onclick="hoardTab('loot',this)">Loot</button>
-    <button class="opt-tab"        id="hoard-tab-badges" onclick="hoardTab('badges',this)">Badges</button>
-    <button class="opt-tab"        id="hoard-tab-cast"   onclick="hoardTab('cast',this)">Cast</button>
+    <button class="opt-tab active" id="trove-tab-loot"   onclick="troveTab('loot',this)">Loot</button>
+    <button class="opt-tab"        id="trove-tab-badges" onclick="troveTab('badges',this)">Badges</button>
+    <button class="opt-tab"        id="trove-tab-cast"   onclick="troveTab('cast',this)">Cast</button>
   </div>
 
-  <div class="opt-section active" id="hoard-loot">
+  <div class="opt-section active" id="trove-loot">
     <div class="sect">Collection</div>
     <div class="loot-filter">
       <button class="lf-btn active" onclick="fLoot('all',this)">All</button>
@@ -1242,12 +1242,12 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
     <div class="loot-grid" id="loot-grid"></div>
   </div>
 
-  <div class="opt-section" id="hoard-badges">
+  <div class="opt-section" id="trove-badges">
     <div class="sect">Achievements</div>
     <div class="badges-grid" id="badges-grid"></div>
   </div>
 
-  <div class="opt-section" id="hoard-cast">
+  <div class="opt-section" id="trove-cast">
     <div class="companion-unlock-banner" id="companion-unlock-banner"></div>
     <div class="companions-header">
       <div class="companions-title">Your Cast</div>
@@ -1264,7 +1264,7 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
       <div class="lore-notes hidden" id="lore-notes"></div>
     </div>
   </div>
-</div><!-- /hoard -->
+</div><!-- /trove -->
 
 <!-- ══════════════════════════════════════════════════════════ -->
 <!-- SETTINGS TAB                                               -->
@@ -6361,20 +6361,20 @@ function goOpt(name) {
   optTab(name);
 }
 
-// Hoard panel has three sub-sections: loot / badges / cast.
-function hoardTab(name, btn) {
-  document.querySelectorAll('#hoard .opt-section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('#hoard .opt-tab').forEach(b => b.classList.remove('active'));
-  const sec = document.getElementById('hoard-' + name);
+// Trove panel has three sub-sections: loot / badges / cast.
+function troveTab(name, btn) {
+  document.querySelectorAll('#trove .opt-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('#trove .opt-tab').forEach(b => b.classList.remove('active'));
+  const sec = document.getElementById('trove-' + name);
   if (sec) sec.classList.add('active');
   if (btn) btn.classList.add('active');
-  else { const b = document.getElementById('hoard-tab-' + name); if (b) b.classList.add('active'); }
+  else { const b = document.getElementById('trove-tab-' + name); if (b) b.classList.add('active'); }
 }
-// Jump to a Hoard sub-tab from elsewhere (e.g. a companion-unlock banner).
-function goHoard(name) {
-  const navBtn = document.querySelector('.nav-btn[onclick*="hoard"]');
-  if (navBtn) go('hoard', navBtn);
-  hoardTab(name || 'loot');
+// Jump to a Trove sub-tab from elsewhere (e.g. a companion-unlock banner).
+function goTrove(name) {
+  const navBtn = document.querySelector('.nav-btn[onclick*="trove"]');
+  if (navBtn) go('trove', navBtn);
+  troveTab(name || 'loot');
 }
 
 function savePronouns(val, btn) {
@@ -6699,8 +6699,20 @@ function loreAddKeydown(e) {
   if (e.key === 'Escape') renderLore();
 }
 
+// Nav label for the merged Loot/Badges/Cast tab — themed like sounds/portraits.
+const TROVE_LABEL = {
+  fantasy: 'Trove',
+  scifi:   'Cache',
+  mystery: 'Casefile',
+  cozy:    'Keepsakes',
+  anime:   'Almanac',
+};
+
 function applyGenreTheme(genre) {
-  document.body.dataset.genre = genre || 'fantasy';
+  const g = genre || 'fantasy';
+  document.body.dataset.genre = g;
+  const hl = document.getElementById('nav-trove-label');
+  if (hl) hl.textContent = TROVE_LABEL[g] || TROVE_LABEL.fantasy;
 }
 
 function applyDarkMode() {
