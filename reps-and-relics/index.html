@@ -440,7 +440,7 @@ body {
   .ex-check-btn { width: 42px; height: 42px; font-size: 21px; }
   .complete-btn { padding: 13px; font-size: 12px; }
   nav { gap: 2px; }
-  .nav-btn { font-size: 9px; padding: 6px 4px; gap: 3px; }
+  .nav-btn { font-size: 10px; padding: 7px 4px; gap: 3px; }
 }
 
 .complete-btn {
@@ -936,8 +936,8 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
   transition: top .22s ease, left .22s ease;
 }
 
-/* ── COMPANIONS TAB ──────────────────────────────────────────── */
-#companions.panel { padding: 14px; max-width: 640px; }
+/* ── HOARD › PARTY SUB-TAB ───────────────────────────────────── */
+#hoard-party { padding-top: 2px; }
 
 .companion-unlock-banner {
   padding: 10px 14px; margin-bottom: 12px;
@@ -1130,9 +1130,7 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
   <button class="nav-btn active" onclick="go('quest',this)">  <i class="ti ti-wand"></i>    Quest</button>
   <button class="nav-btn"        onclick="go('train',this)">  <i class="ti ti-barbell"></i>  Train</button>
   <button class="nav-btn"        onclick="go('streak',this)"> <i class="ti ti-flame"></i>    Streak</button>
-  <button class="nav-btn"        onclick="go('loot',this)">   <i class="ti ti-sparkles"></i> Loot</button>
-  <button class="nav-btn"        onclick="go('badges',this)"> <i class="ti ti-medal"></i>    Badges</button>
-  <button class="nav-btn"        onclick="go('companions',this)"><i class="ti ti-users-group"></i>Party</button>
+  <button class="nav-btn"        onclick="go('hoard',this)">  <i class="ti ti-sparkles"></i> Hoard</button>
   <button class="nav-btn"        onclick="go('settings',this)"><i class="ti ti-settings"></i>Options</button>
 </nav>
 
@@ -1223,48 +1221,50 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 </div><!-- /streak -->
 
 <!-- ══════════════════════════════════════════════════════════ -->
-<!-- LOOT TAB                                                   -->
+<!-- HOARD TAB  (Loot · Badges · Party)                         -->
 <!-- ══════════════════════════════════════════════════════════ -->
-<div class="panel" id="loot">
-  <div class="sect">Collection</div>
-  <div class="loot-filter">
-    <button class="lf-btn active" onclick="fLoot('all',this)">All</button>
-    <button class="lf-btn" data-cat="weapon"   onclick="fLoot('weapon',this)">Weapons</button>
-    <button class="lf-btn" data-cat="garment"  onclick="fLoot('garment',this)">Garments</button>
-    <button class="lf-btn" data-cat="artifact" onclick="fLoot('artifact',this)">Artefacts</button>
-    <button class="lf-btn" data-cat="tome"     onclick="fLoot('tome',this)">Tomes</button>
+<div class="panel" id="hoard">
+  <div class="opt-tabs">
+    <button class="opt-tab active" id="hoard-tab-loot"   onclick="hoardTab('loot',this)">Loot</button>
+    <button class="opt-tab"        id="hoard-tab-badges" onclick="hoardTab('badges',this)">Badges</button>
+    <button class="opt-tab"        id="hoard-tab-party"  onclick="hoardTab('party',this)">Party</button>
   </div>
-  <div class="loot-grid" id="loot-grid"></div>
-</div><!-- /loot -->
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- BADGES TAB                                                 -->
-<!-- ══════════════════════════════════════════════════════════ -->
-<div class="panel" id="badges">
-  <div class="sect">Achievements</div>
-  <div class="badges-grid" id="badges-grid"></div>
-</div><!-- /badges -->
+  <div class="opt-section active" id="hoard-loot">
+    <div class="sect">Collection</div>
+    <div class="loot-filter">
+      <button class="lf-btn active" onclick="fLoot('all',this)">All</button>
+      <button class="lf-btn" data-cat="weapon"   onclick="fLoot('weapon',this)">Weapons</button>
+      <button class="lf-btn" data-cat="garment"  onclick="fLoot('garment',this)">Garments</button>
+      <button class="lf-btn" data-cat="artifact" onclick="fLoot('artifact',this)">Artefacts</button>
+      <button class="lf-btn" data-cat="tome"     onclick="fLoot('tome',this)">Tomes</button>
+    </div>
+    <div class="loot-grid" id="loot-grid"></div>
+  </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- COMPANIONS TAB                                             -->
-<!-- ══════════════════════════════════════════════════════════ -->
-<div class="panel" id="companions">
-  <div class="companion-unlock-banner" id="companion-unlock-banner"></div>
-  <div class="companions-header">
-    <div class="companions-title">Your Party</div>
-    <div class="companions-sub">Complete sessions to unlock new companions</div>
+  <div class="opt-section" id="hoard-badges">
+    <div class="sect">Achievements</div>
+    <div class="badges-grid" id="badges-grid"></div>
   </div>
-  <div class="companions-grid" id="companions-grid"></div>
-  <div class="lore-strip" id="lore-strip">
-    <button class="lore-toggle" id="lore-toggle" onclick="toggleLore()">
-      <i class="ti ti-books"></i>
-      Story notes
-      <span class="lore-count" id="lore-count">0</span>
-      <i class="ti ti-chevron-down"></i>
-    </button>
-    <div class="lore-notes hidden" id="lore-notes"></div>
+
+  <div class="opt-section" id="hoard-party">
+    <div class="companion-unlock-banner" id="companion-unlock-banner"></div>
+    <div class="companions-header">
+      <div class="companions-title">Your Party</div>
+      <div class="companions-sub">Complete sessions to unlock new companions</div>
+    </div>
+    <div class="companions-grid" id="companions-grid"></div>
+    <div class="lore-strip" id="lore-strip">
+      <button class="lore-toggle" id="lore-toggle" onclick="toggleLore()">
+        <i class="ti ti-books"></i>
+        Story notes
+        <span class="lore-count" id="lore-count">0</span>
+        <i class="ti ti-chevron-down"></i>
+      </button>
+      <div class="lore-notes hidden" id="lore-notes"></div>
+    </div>
   </div>
-</div><!-- /companions -->
+</div><!-- /hoard -->
 
 <!-- ══════════════════════════════════════════════════════════ -->
 <!-- SETTINGS TAB                                               -->
@@ -6359,6 +6359,22 @@ function goOpt(name) {
   const navBtn = document.querySelector('.nav-btn[onclick*="settings"]');
   if (navBtn) go('settings', navBtn);
   optTab(name);
+}
+
+// Hoard panel has three sub-sections: loot / badges / party.
+function hoardTab(name, btn) {
+  document.querySelectorAll('#hoard .opt-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('#hoard .opt-tab').forEach(b => b.classList.remove('active'));
+  const sec = document.getElementById('hoard-' + name);
+  if (sec) sec.classList.add('active');
+  if (btn) btn.classList.add('active');
+  else { const b = document.getElementById('hoard-tab-' + name); if (b) b.classList.add('active'); }
+}
+// Jump to a Hoard sub-tab from elsewhere (e.g. a companion-unlock banner).
+function goHoard(name) {
+  const navBtn = document.querySelector('.nav-btn[onclick*="hoard"]');
+  if (navBtn) go('hoard', navBtn);
+  hoardTab(name || 'loot');
 }
 
 function savePronouns(val, btn) {
