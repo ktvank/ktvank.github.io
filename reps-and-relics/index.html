@@ -389,6 +389,12 @@ body {
 }
 .trim-banner button { margin-left: 6px; background: none; border: none; color: var(--sky2); text-decoration: underline; cursor: pointer; font-size: 11px; }
 .exd-danger { width: 100%; margin-top: 8px; padding: 8px; background: var(--rose4); border: 1px solid var(--rose3); border-radius: var(--radius); color: var(--rose2); font-size: 11px; cursor: pointer; }
+.goal-checkin { background: var(--dusk4); border: 1px solid var(--dusk3); border-radius: var(--radius); padding: 11px 12px; margin-bottom: 12px; }
+.goal-checkin-q { font-size: 12px; color: var(--ink2); margin-bottom: 8px; }
+.goal-checkin-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.goal-checkin-opts button { font-size: 11px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--dusk3); background: var(--parch); color: var(--dusk2); cursor: pointer; }
+.goal-checkin-opts button:hover { background: var(--dusk3); }
+.goal-checkin-opts button.ghost { border-color: transparent; color: var(--ink4); }
 
 /* ── PROGRESSION LOG (Streak tab) ────────────────────────────── */
 .prog-log { display: flex; flex-direction: column; gap: 12px; }
@@ -1298,6 +1304,16 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
       </div>
       <div style="font-size:10px;color:var(--ink4);margin-top:4px;margin-bottom:6px">Tick only what you actually have. Nothing ticked = bodyweight only.</div>
 
+      <div class="s-row" style="margin-top:10px"><div>
+        <div class="s-lbl">Right now I want to…</div>
+        <div class="s-sub" id="goal-focus-note"></div>
+      </div></div>
+      <div class="wizard-opt-row" id="s-goal-btns">
+        <button class="wizard-opt" onclick="setGoal('build')">Keep progressing</button>
+        <button class="wizard-opt" onclick="setGoal('maintain')">Maintain</button>
+        <button class="wizard-opt" onclick="refocusTraining()">Switch focus…</button>
+      </div>
+
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button class="s-btn" onclick="saveCustomizations()">Save notes</button>
         <button class="s-btn" id="regen-btn" onclick="regenerateRegime()" style="background:var(--dusk4);border-color:var(--dusk3);color:var(--dusk2)">Regenerate Regime</button>
@@ -2001,6 +2017,27 @@ function matchExerciseByName(name) {
 const EX_IMG_BASE = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/';
 function exImageUrls(e) { return (e && e.img || []).map(p => EX_IMG_BASE + p); }
 
+/* "Something hurts" — bench a movement TEMPORARILY. It returns on its own after
+   a couple of weeks; benching the same movement repeatedly extends the window
+   and prompts the user that recurring pain is worth looking into. */
+const BENCH_DAYS = 18;
+const BENCH_DAYS_RECURRING = 35;
+function isBenched(exId) {
+  const b = (S.benched || {})[exId];
+  return !!(b && b.until && b.until >= today());
+}
+function benchExercise(exId, name) {
+  if (!S.benched) S.benched = {};
+  const prev  = S.benched[exId] || { count: 0 };
+  const count = (prev.count || 0) + 1;
+  const days  = count >= 2 ? BENCH_DAYS_RECURRING : BENCH_DAYS;
+  S.benched[exId] = { until: daysAgo(-days), count, name: name || prev.name || exId };
+  return { count, days };
+}
+function unbench(exId) {
+  if (S.benched && S.benched[exId]) S.benched[exId].until = null;
+}
+
 // Map the app's equipment prefs to the DB's eq buckets. Bodyweight is always in.
 const _EQ_BUCKETS = new Set(['bands', 'dumbbells', 'kettlebells', 'barbell', 'cable', 'machine']);
 function allowedEquipment(prefsEquip) {
@@ -2020,11 +2057,10 @@ function filterExercises({ equipment, maxLevel = 'intermediate', muscles = null,
   const eqSet = equipment instanceof Set ? equipment : allowedEquipment(equipment);
   const lvlCeil = levelRank(maxLevel);
   const muSet = muscles ? new Set(muscles) : null;
-  const avoid = new Set(S.avoidExercises || []);   // "this hurts" — never auto-pick
   return _exDB.filter(e =>
     eqSet.has(e.eq) &&
     levelRank(e.level) <= lvlCeil &&
-    !avoid.has(e.id) &&
+    !isBenched(e.id) &&
     (!category || e.cat === category) &&
     (!muSet || e.pm.some(m => muSet.has(m)))
   );
@@ -2341,6 +2377,7 @@ function applyFeel(ex, feel) {
 
   if (b.readyStreak >= READY_STREAK_TO_ADVANCE) {
     b.readyStreak = 0;
+    if (S.trainingGoal === 'maintain') return null;   // hold loads steady
     _advanceNotch(b, ex, true);
     return 'up';
   }
@@ -2731,8 +2768,11 @@ let S = {
   workoutLog:      [],     // [{ date, narrativeId, role, entries:[{key,name,feel}] }]
   progressionLog:  [],     // [{ date, key, name, change, from, to, trigger }]
   exerciseFeel:    {},     // { "si-ei": "easy"|"ok"|"hard" } — in-progress feel taps, cleared on complete
-  avoidExercises:  [],     // exIds benched via "something hurts" — never auto-picked
+  benched:         {},     // exId → { until: ISO date, count, name } — "something hurts", temporary
   todayTrim:       null,   // { date, sess, minutes } — per-day time budget
+  trainingGoal:    'build',// 'build' (keep progressing) | 'maintain' (hold loads)
+  trainingFocus:   '',     // free-text emphasis fed into session generation
+  lastGoalCheckIn: 0,      // lifetimeSessions at the last goal check-in
 };
 
 let curLootFilter = 'all';
@@ -2910,6 +2950,14 @@ function migrateNarratives() {
   if (S.lifetimeSessions === undefined) S.lifetimeSessions = S.sessions || 0;
   if (!S.chronicle) S.chronicle = { arcsCompleted: [], strengthMilestones: [] };
   if (!S.charFlags) S.charFlags = [];
+  // avoidExercises[] (permanent) → benched{} (temporary, ~3 weeks from now)
+  if (Array.isArray(S.avoidExercises)) {
+    if (!S.benched) S.benched = {};
+    for (const id of S.avoidExercises) if (!S.benched[id]) S.benched[id] = { until: daysAgo(-21), count: 1, name: id };
+    delete S.avoidExercises;
+  }
+  if (!S.benched) S.benched = {};
+  if (!S.trainingGoal) S.trainingGoal = 'build';
   S.schema = 4;
 }
 
@@ -3297,7 +3345,21 @@ function renderAll() {
   renderDevToggles();
   renderAppearanceSettings();
   renderNarratives();
+  renderTrainingGoal();
   renderSaves();
+}
+
+function renderTrainingGoal() {
+  const row = document.getElementById('s-goal-btns');
+  if (row) {
+    const btns = row.querySelectorAll('.wizard-opt');
+    btns[0] && btns[0].classList.toggle('sel', (S.trainingGoal || 'build') === 'build');
+    btns[1] && btns[1].classList.toggle('sel', S.trainingGoal === 'maintain');
+  }
+  const note = document.getElementById('goal-focus-note');
+  if (note) note.textContent = S.trainingFocus
+    ? `Focus: ${S.trainingFocus}`
+    : (S.trainingGoal === 'maintain' ? 'Holding loads steady — no automatic increases.' : 'Loads and reps climb as they get easy.');
 }
 
 /* ── Hero card ──────────────────────────────────────────────── */
@@ -3426,10 +3488,12 @@ async function openExerciseDetail(si, ei) {
       ${ex.h ? `<p class="exd-note" style="margin-top:12px;font-style:normal;color:var(--ink2);font-family:inherit;font-size:12px">${escHtml(withName(ex.h))}</p>` : ''}
       <div class="exd-note" style="margin-top:12px">No detailed guide is available for this exercise.</div>`;
   }
-  const benched = ex.exId && (S.avoidExercises || []).includes(ex.exId);
+  const benched = ex.exId && isBenched(ex.exId);
+  const bInfo = ex.exId && (S.benched || {})[ex.exId];
   const actions = ex.exId ? (benched
-    ? `<button class="exd-danger" style="background:var(--sage4);border-color:var(--sage3);color:var(--sage2)" onclick="unbenchExercise('${ex.exId}')">Un-bench — allow this exercise again</button>`
-    : `<button class="exd-danger" onclick="hurtExercise(${si},${ei})">Something hurts — swap it out & bench it</button>`) : '';
+    ? `<div class="exd-note" style="margin-top:10px">Benched until ${escHtml(bInfo.until)}${bInfo.count > 1 ? ` · benched ${bInfo.count}× — worth getting checked` : ''}.</div>
+       <button class="exd-danger" style="background:var(--sage4);border-color:var(--sage3);color:var(--sage2)" onclick="unbenchExercise('${ex.exId}')">Bring it back now</button>`
+    : `<button class="exd-danger" onclick="hurtExercise(${si},${ei})">Something hurts — rest this movement for a while</button>`) : '';
   card.innerHTML = header + body + actions + `<button class="exd-close" onclick="closeExerciseDetail()">Close</button>`;
 }
 
@@ -3984,24 +4048,31 @@ async function swapExercise(si, ei, opts = {}) {
   toast(opts.silent ? '' : `Swapped in ${pick.name} — your progress carried over.`);
 }
 
-// "This hurts" — bench a movement so it's never auto-picked again, and swap it now.
+// "Something hurts" — bench a movement for a couple of weeks, then it returns.
 async function hurtExercise(si, ei) {
   const sess = getSessions()[si];
   const ex = sess && sess.exercises[ei];
   if (!ex) return;
   if (!ex.exId) { toast('Custom exercise — just delete or edit it.'); return; }
-  if (!confirm(`Something hurts on "${ex.p}"?\n\nIt'll be swapped for a similar movement now and kept out of future generated workouts. You can un-bench it later from its info sheet.`)) return;
-  if (!S.avoidExercises) S.avoidExercises = [];
-  if (!S.avoidExercises.includes(ex.exId)) S.avoidExercises.push(ex.exId);
+  const prevCount = ((S.benched || {})[ex.exId] || {}).count || 0;
+  const recurring = prevCount >= 1;
+  const msg = recurring
+    ? `"${ex.p}" again? That's the ${prevCount + 1}${prevCount + 1 === 2 ? 'nd' : prevCount + 1 === 3 ? 'rd' : 'th'} time.\n\nRecurring pain in the same movement is worth getting looked at — consider a physio or your doctor. It'll be swapped out and rested longer this time.`
+    : `Something hurts on "${ex.p}"?\n\nIt'll be swapped for a similar movement and rested for a couple of weeks, then it comes back automatically. Bring it back sooner from its info sheet any time.`;
+  if (!confirm(msg)) return;
+  const { count, days } = benchExercise(ex.exId, ex.p);
   closeExerciseDetail();
   await swapExercise(si, ei, { silent: true });
-  toast(`Benched "${ex.p}". Swapped in a similar movement — take it easy.`);
+  toast(count >= 2
+    ? `Benched "${ex.p}" for ${days} days. Please get that checked if it keeps up.`
+    : `Benched "${ex.p}" for ${days} days — it'll return on its own. Take it easy.`);
 }
 function unbenchExercise(exId) {
-  S.avoidExercises = (S.avoidExercises || []).filter(id => id !== exId);
+  unbench(exId);
   save();
   closeExerciseDetail();
-  toast('Un-benched — it can show up in generated workouts again.');
+  renderWorkoutCard();
+  toast('Back in rotation — ease into it and see how it feels.');
 }
 
 // Per-day time budget: skip the trailing exercises to fit today's window.
@@ -4022,6 +4093,42 @@ function clearTodayTrim() {
   S.todayTrim = null;
   save();
   renderWorkoutCard();
+}
+
+/* ── Periodic training-goal check-in ──────────────────────────── */
+const GOAL_CHECKIN_EVERY = 12;   // lifetime sessions between prompts
+const GOALS = {
+  build:    { label: 'Keep progressing', sub: 'push loads and reps up as they get easy' },
+  maintain: { label: 'Maintenance',      sub: 'hold where I am — no automatic increases' },
+};
+function shouldGoalCheckIn() {
+  if (!S.setupComplete) return false;
+  return (S.lifetimeSessions || 0) - (S.lastGoalCheckIn || 0) >= GOAL_CHECKIN_EVERY;
+}
+function setGoal(g) {
+  S.trainingGoal = g;
+  S.lastGoalCheckIn = S.lifetimeSessions || 0;
+  save();
+  renderWorkoutCard();
+  if (document.getElementById('opt-workout')) renderAll();
+  toast(g === 'maintain' ? 'Maintenance mode — loads will hold steady.' : 'Progressing — I\'ll nudge things up as they get easy.');
+}
+function dismissGoalCheckIn() {
+  S.lastGoalCheckIn = S.lifetimeSessions || 0;
+  save();
+  renderWorkoutCard();
+}
+async function refocusTraining() {
+  const cur = S.trainingFocus || '';
+  const ans = prompt('New focus for your sessions?\n\ne.g. "upper body", "legs and glutes", "core and mobility", "athletic / explosive", "back to full-body"', cur);
+  if (ans === null) return;
+  S.trainingFocus = ans.trim();
+  S.lastGoalCheckIn = S.lifetimeSessions || 0;
+  save();
+  if (!getApiKey()) { toast('Focus saved — it\'ll apply next time sessions are generated.'); return; }
+  toast('Rebuilding your sessions around that focus…');
+  try { await generateSessions('fresh'); save(); renderAll(); toast('✦ Sessions refocused.'); }
+  catch (e) { toast(e.message === EX_DB_ERROR ? EX_DB_ERROR : 'Could not regenerate — try again from Options.'); }
 }
 
 function deleteExercise(si, ei) {
@@ -4103,6 +4210,16 @@ function renderWorkoutCard() {
         `}
       </div>
     </div>
+    ${shouldGoalCheckIn() ? `<div class="goal-checkin">
+      <div class="goal-checkin-q">You've done ${S.lifetimeSessions} sessions. Where do you want to take training?</div>
+      <div class="goal-checkin-opts">
+        <button onclick="setGoal('build')">Keep progressing</button>
+        <button onclick="setGoal('maintain')">Maintenance</button>
+        <button onclick="refocusTraining()">Switch focus…</button>
+        <button class="ghost" onclick="dismissGoalCheckIn()">Not now</button>
+      </div>
+    </div>` : ''}
+    ${S.trainingGoal === 'maintain' ? `<div class="trim-banner" style="color:var(--gold2);background:var(--gold4);border-color:var(--gold3)">Maintenance mode — loads holding steady. <button onclick="setGoal('build')">Resume progressing</button></div>` : ''}
     ${held.size ? `<div class="trim-banner">Trimmed to ~${estimateSessionMinutes(sess.exercises.filter((_, i) => !held.has(i)))} min for today — ${held.size} held back. <button onclick="clearTodayTrim()">Undo</button></div>` : ''}
     <ul class="ex-list">
       ${sess.exercises.map((e, i) => {
@@ -5398,6 +5515,7 @@ async function generateSessions(mode) {
 
   const prompt = `Build exactly 3 workout sessions (roles A, B, C) for a fitness app.
 Experience level: ${p.experience}. Genre theme for the thematic names: ${exerciseNameStyle()}. Tone: ${p.tone}.${refreshCtx}
+${S.trainingFocus ? `\nCurrent focus (weight the selection toward this): "${S.trainingFocus}"\n` : ''}
 ${p.exerciseNote ? `\nUser's training notes (honour these — pick safe menu ids accordingly): "${p.exerciseNote}"\n` : ''}
 Roles:
   A (Recommended): balanced, covers the main movement patterns. 5 exercises.
