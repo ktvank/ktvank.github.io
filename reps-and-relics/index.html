@@ -2501,8 +2501,11 @@ const NARRATIVE_FIELDS = [
   'customSessions', 'levelLoot', 'earnedTitles',
   'customLoot', 'customBadges', 'customLevelLoot', 'customReminders',
   'loreNotes', 'companionsSeen', 'companionCandidates', 'generatedCompanions',
-  'completedToday', 'completedSessList', 'exerciseChecked', 'charFlags',
+  'exerciseChecked', 'charFlags',
 ];
+// completedToday / completedSessList stay on the SHARED CORE, not here: you have
+// one body and one training day, so "done today" must hold across every narrative
+// (otherwise the same real workout could be re-completed in each story).
 // prefs sub-keys that belong to the narrative skin (the rest of prefs is core).
 const NARRATIVE_PREFS = ['genre', 'tone', 'heroClass', 'vibeNote', 'personalityNote'];
 
@@ -2583,7 +2586,7 @@ async function createNarrative({ genre, tone, heroClass, name, label }) {
   S.customSessions = []; S.levelLoot = []; S.earnedTitles = [];
   S.customLoot = []; S.customBadges = []; S.customLevelLoot = []; S.customReminders = [];
   S.loreNotes = []; S.companionsSeen = []; S.companionCandidates = []; S.generatedCompanions = [];
-  S.completedToday = null; S.completedSessList = []; S.exerciseChecked = {};
+  S.exerciseChecked = {};  // completedToday / completedSessList are shared core — don't reset
   S.charFlags = [];
   if (!S.prefs) S.prefs = {};
   if (genre) S.prefs.genre = genre;
