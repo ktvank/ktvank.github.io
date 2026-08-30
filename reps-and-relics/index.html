@@ -3600,6 +3600,24 @@ function toggleCheck(si, ei) {
     if (icon) icon.className = `ti ti-${checked ? 'circle-check-filled' : 'circle'}`;
     const btn = item.querySelector('.ex-check-btn');
     if (btn) btn.setAttribute('aria-label', checked ? 'Uncheck' : 'Check');
+
+    // show/hide the "How did that feel?" row (template only builds it at render time)
+    let feelRow = item.querySelector('.ex-feel');
+    if (checked && !feelRow) {
+      feelRow = document.createElement('div');
+      feelRow.className = 'ex-feel';
+      feelRow.setAttribute('role', 'group');
+      feelRow.setAttribute('aria-label', 'How did that feel?');
+      const cur = (S.exerciseFeel || {})[key];
+      feelRow.innerHTML = '<span class="ex-feel-q">How did that feel?</span>' +
+        ['easy', 'ok', 'hard'].map(f =>
+          `<button class="ex-feel-btn${cur === f ? ' sel' : ''}" onclick="setFeel(${si},${ei},'${f}')">${FEEL_LABELS[f]}</button>`
+        ).join('');
+      item.appendChild(feelRow);
+    } else if (!checked && feelRow) {
+      feelRow.remove();
+      if (S.exerciseFeel) { delete S.exerciseFeel[key]; save(); }
+    }
   } else {
     renderWorkoutCard();
     return;
