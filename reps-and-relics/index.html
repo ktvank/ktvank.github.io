@@ -1922,6 +1922,35 @@ function loadExerciseDB() {
 }
 function exById(id) { return _exById ? _exById[id] : null; }
 
+// Fuzzy-match a free-typed exercise name against the DB. Returns the best record
+// only when the match is confident (exact, containment, or heavy token overlap).
+function _normName(s) {
+  return String(s || '').toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/(\w)s\b/g, '$1')   // crude singularise so "pushups" ~ "push-up"
+    .replace(/\s+/g, ' ').trim();
+}
+function matchExerciseByName(name) {
+  if (!_exDB) return null;
+  const q = _normName(name);
+  if (!q) return null;
+  const qtok = new Set(q.split(' ').filter(Boolean));
+  let best = null, bestScore = 0;
+  for (const e of _exDB) {
+    const n = _normName(e.name);
+    let score = 0;
+    if (n === q) score = 1;
+    else if (n.includes(q) || q.includes(n)) score = 0.8;
+    else {
+      const ntok = n.split(' ').filter(Boolean);
+      const overlap = ntok.filter(w => qtok.has(w)).length;
+      score = overlap / Math.max(qtok.size, ntok.length);
+    }
+    if (score > bestScore) { bestScore = score; best = e; }
+  }
+  return bestScore >= 0.7 ? best : null;
+}
+
 // yuhonas image paths are relative to the repo's exercises/ dir; serve from jsDelivr.
 const EX_IMG_BASE = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/';
 function exImageUrls(e) { return (e && e.img || []).map(p => EX_IMG_BASE + p); }
@@ -2106,7 +2135,71 @@ function parseSetsSpec(setsStr) {
   return { sets, lo, hi: Math.max(lo, hi) };
 }
 
-// Create (lazily) the baseline for an exercise from its current prescription.
+// One step up on a baseline (reps → then load / added set / longer hold).
+function _advanceNotch(b, ex, doLog) {
+  const from = displaySetsFor(ex);
+  let change;
+  if (b.targetReps < b.repRange[1]) {
+    b.targetReps = Math.min(b.repRange[1], b.targetReps + (b.kind === 'timed' ? 5 : 1));
+    change = b.kind === 'timed' ? 'time' : 'reps';
+  } else if (b.kind === 'load') {
+    b.load = (b.load || 0) + loadIncrement(b);
+    b.targetReps = b.repRange[0];
+    change = 'load';
+  } else {
+    b.sets = Math.min(4, b.sets + 1);
+    b.targetReps = b.repRange[0];
+    change = 'sets';
+  }
+  if (doLog) logProgression(ex, change, from, displaySetsFor(ex), 'two easy sessions');
+}
+
+// Net step-ups an exercise has earned so far (advances minus deloads).
+function _netNotches(key) {
+  let n = 0;
+  for (const e of (S.progressionLog || [])) {
+    if (e.key !== key) continue;
+    if (e.change === 'deload') n--;
+    else if (e.change !== 'start') n++;
+  }
+  return Math.max(0, n);
+}
+
+// Guess a starting point for a brand-new exercise from how far the user has
+// already progressed on related movements — so you don't re-climb from zero
+// every time a routine regenerates or a new accessory shows up.
+function seedBaselineFromPeers(ex, b) {
+  const rec = ex.exId ? exById(ex.exId) : null;
+  if (!rec) return false;
+  const pat = _exPattern(rec);
+  const muscles = new Set(rec.pm || []);
+  const peerN = [];
+  for (const key of Object.keys(S.baselines || {})) {
+    if (key === baselineKey(ex)) continue;
+    const pb = S.baselines[key];
+    if (!pb || pb.kind !== b.kind) continue;
+    const prec = key.indexOf('name:') === 0 ? null : exById(key);
+    if (!prec) continue;
+    if (_exPattern(prec) === pat || (prec.pm || []).some(m => muscles.has(m))) {
+      peerN.push(_netNotches(key));
+    }
+  }
+  if (!peerN.length) return false;
+  peerN.sort((a, z) => a - z);
+  const median = peerN[Math.floor(peerN.length / 2)];
+  // be conservative on a movement they haven't actually done: ~60%, cap 6
+  const notches = Math.min(6, Math.round(median * 0.6));
+  for (let i = 0; i < notches; i++) _advanceNotch(b, ex, false);
+  if (notches > 0) {
+    b.estimated = true;
+    logProgression(ex, 'start', '', displaySetsFor(ex), 'estimated from your other lifts');
+  }
+  return notches > 0;
+}
+
+// Create (lazily) the baseline for an exercise. Starts from the generic
+// prescription, then nudges it forward to match the user's existing progress
+// on similar movements.
 function ensureBaseline(ex) {
   if (!S.baselines) S.baselines = {};
   const key = baselineKey(ex);
@@ -2126,6 +2219,7 @@ function ensureBaseline(ex) {
   };
   S.baselines[key] = b;
   if (!S.progressionLog) S.progressionLog = [];
+  seedBaselineFromPeers(ex, b);
   return b;
 }
 
@@ -2159,19 +2253,7 @@ function applyFeel(ex, feel) {
 
   if (b.readyStreak >= READY_STREAK_TO_ADVANCE) {
     b.readyStreak = 0;
-    const from = displaySetsFor(ex);
-    if (b.targetReps < b.repRange[1]) {
-      b.targetReps = Math.min(b.repRange[1], b.targetReps + (b.kind === 'timed' ? 5 : 1));
-      logProgression(ex, b.kind === 'timed' ? 'time' : 'reps', from, displaySetsFor(ex), 'two easy sessions');
-    } else if (b.kind === 'load') {
-      b.load = (b.load || 0) + loadIncrement(b);
-      b.targetReps = b.repRange[0];
-      logProgression(ex, 'load', from, displaySetsFor(ex), 'two easy sessions');
-    } else {
-      b.sets = Math.min(4, b.sets + 1);
-      b.targetReps = b.repRange[0];
-      logProgression(ex, 'sets', from, displaySetsFor(ex), 'two easy sessions');
-    }
+    _advanceNotch(b, ex, true);
     return 'up';
   }
   if (b.struggleStreak >= STRUGGLE_STREAK_TO_DELOAD) {
@@ -3340,22 +3422,56 @@ async function saveExercise(si, ei) {
   const sv = ((document.getElementById('ef-s') || {}).value || '').trim();
   if (ei === 'new') {
     if (!pv) { toast('Enter a plain name for the exercise.'); return; }
+
+    // Is this already a known exercise? Offer to use it (gets a form guide +
+    // proper progression tracking) instead of adding an untracked custom one.
+    let matched = null;
+    try { await loadExerciseDB(); matched = matchExerciseByName(pv); } catch (_) {}
+    let useMatch = false;
+    if (matched && _normName(matched.name) !== _normName(pv)) {
+      useMatch = confirm(`Did you mean "${matched.name}"?\n\nUse it and you get the form guide, photos, and smarter progression. Choose Cancel to keep "${pv}" as your own custom exercise.`);
+    } else if (matched) {
+      useMatch = true;
+    }
+
     let fantasyName = fv;
     if (!fantasyName) {
       const addBtn = document.querySelector('.ex-save-btn');
       if (addBtn) { addBtn.disabled = true; addBtn.textContent = 'Naming…'; }
-      fantasyName = await generateExerciseName(pv);
+      fantasyName = await generateExerciseName(useMatch ? matched.name : pv);
     }
-    S.customSessions[si].exercises.push({
-      f: fantasyName || pv, p: pv, h: hv, sets: sv || '3 × 10', xp: 15
-    });
+
+    if (useMatch) {
+      S.customSessions[si].exercises.push({
+        f: fantasyName || matched.name, p: matched.name, exId: matched.id,
+        h: hv || (matched.ins || []).slice(0, 2).join(' '),
+        sets: sv || setsStringFromRule(progressionRule('hypertrophy', (S.prefs || {}).experience), matched.force === 'static'),
+        muscles: matched.pm ? matched.pm.slice() : [], xp: 15,
+      });
+    } else {
+      S.customSessions[si].exercises.push({
+        f: fantasyName || pv, p: pv, h: hv, sets: sv || '3 × 10', xp: 15,
+      });
+      toast('Added as a custom exercise — no form guide, and its progression is a rough guess from the sets you entered.');
+    }
   } else {
     const e = S.customSessions[si] && S.customSessions[si].exercises[ei];
     if (e) {
+      const setsChanged = sv && sv !== e.sets;
       if (fv) e.f = fv;
       if (pv) e.p = pv;
       if (hv) e.h = hv;
       if (sv) e.sets = sv;
+      // Editing the sets/reps re-bases the tracked progression to match.
+      if (setsChanged && S.baselines) {
+        const key = baselineKey(e);
+        const had = S.baselines[key];
+        if (!had || !S.progressionLog || !S.progressionLog.some(p => p.key === key && p.change !== 'start')
+            || confirm('Change the target for this exercise? This resets its tracked progression to the new sets/reps.')) {
+          delete S.baselines[key];
+          ensureBaseline(e);
+        }
+      }
     }
   }
   editingExercise = null;
@@ -3889,14 +4005,14 @@ function renderProgressionLog() {
   const groups = Object.values(byKey).sort((a, b) =>
     (b[b.length - 1].date).localeCompare(a[a.length - 1].date));
   const fmt = ds => { const [y, m, d] = ds.split('-'); return `${+m}/${+d}`; };
-  const verb = { reps: 'reps up', time: 'longer hold', load: 'load up', sets: 'added a set', deload: 'eased back', start: 'started' };
+  const verb = { reps: 'reps up', time: 'longer hold', load: 'load up', sets: 'added a set', deload: 'eased back', start: 'starting point' };
   el.innerHTML = groups.map(rows => `
     <div class="prog-ex">
       <div class="prog-ex-name">${escHtml(rows[rows.length - 1].name)}</div>
       ${rows.slice().reverse().map(r => `
         <div class="prog-row ${r.change === 'deload' ? 'deload' : 'up'}">
           <span class="prog-when">${fmt(r.date)}</span>
-          <span class="prog-what">${escHtml(verb[r.change] || r.change)} — ${escHtml(r.from || '')} → <strong>${escHtml(r.to || '')}</strong></span>
+          <span class="prog-what">${escHtml(verb[r.change] || r.change)} — ${r.from ? escHtml(r.from) + ' → ' : ''}<strong>${escHtml(r.to || '')}</strong>${r.trigger && r.trigger.indexOf('estimated') === 0 ? ' <em style="opacity:.7">(estimated)</em>' : ''}</span>
         </div>`).join('')}
     </div>`).join('');
 }
