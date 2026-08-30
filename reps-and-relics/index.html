@@ -1216,6 +1216,39 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
   <div class="sect">Last 28 days</div>
   <div class="cal-grid" id="cal-grid"></div>
 
+  <div class="sect">Schedule</div>
+  <div class="setting-group">
+    <div class="s-row">
+      <div>
+        <div class="s-lbl">Rest day</div>
+        <div class="s-sub">Mark today as intentional rest — streak won't break.</div>
+      </div>
+      <button class="s-btn" id="offday-btn-s" onclick="markOffDay()" style="margin-top:0;white-space:nowrap">Mark today</button>
+    </div>
+    <div class="notif-st" id="offday-st-s"></div>
+
+    <div class="s-row" style="margin-top:14px"><div>
+      <div class="s-lbl">Vacation mode</div>
+      <div class="s-sub">Pause streak and reminders until your return date.</div>
+    </div></div>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+      <input class="s-input" type="date" id="pause-until-in-s" style="flex:1;min-width:0;margin-top:0"/>
+      <button class="s-btn" onclick="setPause()" style="margin-top:0;white-space:nowrap">Pause until</button>
+    </div>
+    <div class="notif-st" id="pause-st-s"></div>
+
+    <div class="s-row" style="margin-top:14px"><div>
+      <div class="s-lbl">Reminder threshold</div>
+      <div class="s-sub">Nag after this many idle days.</div>
+    </div></div>
+    <div class="wizard-opt-row" id="nag-btns-s">
+      <button class="wizard-opt" data-n="2" onclick="saveNagFreq(2,this)">2 days</button>
+      <button class="wizard-opt" data-n="3" onclick="saveNagFreq(3,this)">3 days</button>
+      <button class="wizard-opt" data-n="5" onclick="saveNagFreq(5,this)">5 days</button>
+      <button class="wizard-opt" data-n="7" onclick="saveNagFreq(7,this)">1 week</button>
+    </div>
+  </div>
+
   <div class="sect">Progression</div>
   <div class="prog-log" id="prog-log"></div>
 </div><!-- /streak -->
@@ -4430,6 +4463,7 @@ function renderStreakTab() {
     grid.appendChild(div);
   }
   renderProgressionLog();
+  updateScheduleUI();
 }
 
 function renderProgressionLog() {
@@ -6418,36 +6452,41 @@ function saveClass() {
 }
 
 /* ── Schedule / pause / off-day ─────────────────────────────── */
+/* The same controls live in two places — Options → Workout and the
+   Streak tab (ids suffixed "-s"). Every getter/updater covers both. */
+const SCHED_SCOPES = ['', '-s'];
+
 function updateScheduleUI() {
-  const pauseSt  = document.getElementById('pause-st');
-  const pauseIn  = document.getElementById('pause-until-in');
-  if (pauseSt) {
-    if (isPaused()) {
-      const d = new Date(S.pauseUntil + 'T00:00:00').toLocaleDateString(undefined, { month:'long', day:'numeric' });
-      pauseSt.innerHTML = `<span class="dot dot-ok"></span>Paused until ${d} &nbsp;·&nbsp; <a href="#" onclick="resumeNow();return false" style="color:var(--sage2)">Resume now</a>`;
-    } else {
-      pauseSt.innerHTML = '';
-    }
-  }
-  if (pauseIn) { pauseIn.min = today(); if (!isPaused()) pauseIn.value = ''; }
-
-  const offSt  = document.getElementById('offday-st');
-  const offBtn = document.getElementById('offday-btn');
-  if (offSt && offBtn) {
-    const markedToday = (S.offDays || []).includes(today());
-    offSt.innerHTML = markedToday ? `<span class="dot dot-ok"></span>Today is marked as a rest day` : '';
-    offBtn.disabled  = markedToday;
-    offBtn.textContent = markedToday ? '✓ Rest day marked' : 'Mark today';
-  }
-
+  const markedToday = (S.offDays || []).includes(today());
   const nagFreq = (S.prefs || {}).nagAfterDays || 2;
-  document.querySelectorAll('#nag-btns .wizard-opt').forEach(btn => {
-    btn.classList.toggle('sel', parseInt(btn.dataset.n) === nagFreq);
-  });
+  const paused = isPaused();
+  const pausedTxt = paused
+    ? `<span class="dot dot-ok"></span>Paused until ${new Date(S.pauseUntil + 'T00:00:00').toLocaleDateString(undefined, { month:'long', day:'numeric' })} &nbsp;·&nbsp; <a href="#" onclick="resumeNow();return false" style="color:var(--sage2)">Resume now</a>`
+    : '';
+
+  for (const sfx of SCHED_SCOPES) {
+    const pauseSt = document.getElementById('pause-st' + sfx);
+    const pauseIn = document.getElementById('pause-until-in' + sfx);
+    if (pauseSt) pauseSt.innerHTML = pausedTxt;
+    if (pauseIn) { pauseIn.min = today(); if (!paused) pauseIn.value = ''; }
+
+    const offSt  = document.getElementById('offday-st' + sfx);
+    const offBtn = document.getElementById('offday-btn' + sfx);
+    if (offSt)  offSt.innerHTML = markedToday ? `<span class="dot dot-ok"></span>Today is marked as a rest day` : '';
+    if (offBtn) {
+      offBtn.disabled = markedToday;
+      offBtn.textContent = markedToday ? '✓ Rest day marked' : 'Mark today';
+    }
+
+    document.querySelectorAll('#nag-btns' + sfx + ' .wizard-opt').forEach(btn => {
+      btn.classList.toggle('sel', parseInt(btn.dataset.n) === nagFreq);
+    });
+  }
 }
 
 function setPause() {
-  const v = (document.getElementById('pause-until-in') || {}).value;
+  const el = SCHED_SCOPES.map(s => document.getElementById('pause-until-in' + s)).find(e => e && e.value);
+  const v = el && el.value;
   if (!v || v < today()) { toast('Pick a future return date.'); return; }
   S.pauseUntil = v;
   save();
@@ -6477,8 +6516,7 @@ function saveNagFreq(n, btn) {
   if (!S.prefs) S.prefs = {};
   S.prefs.nagAfterDays = n;
   save();
-  document.querySelectorAll('#nag-btns .wizard-opt').forEach(b => b.classList.remove('sel'));
-  btn.classList.add('sel');
+  updateScheduleUI();
   updateNotifUI();
 }
 
