@@ -381,6 +381,14 @@ body {
 .ex-feel-btn:hover { border-color: var(--ink3); color: var(--ink); }
 .ex-feel-btn.sel { background: var(--sage3); border-color: var(--sage2); color: var(--sage2); }
 .ex-item.checked .ex-feel { opacity: 1; }
+.ex-item.ex-held .ex-content, .ex-item.ex-held .ex-meta { opacity: .45; }
+.ex-item.ex-held .ex-plain::after { content: ' · held for today'; font-size: 9px; color: var(--ink4); font-style: italic; }
+.trim-banner {
+  font-size: 11px; color: var(--sky2); background: var(--sky4); border: 1px solid var(--sky3);
+  border-radius: var(--radius); padding: 7px 10px; margin-bottom: 10px;
+}
+.trim-banner button { margin-left: 6px; background: none; border: none; color: var(--sky2); text-decoration: underline; cursor: pointer; font-size: 11px; }
+.exd-danger { width: 100%; margin-top: 8px; padding: 8px; background: var(--rose4); border: 1px solid var(--rose3); border-radius: var(--radius); color: var(--rose2); font-size: 11px; cursor: pointer; }
 
 /* ── PROGRESSION LOG (Streak tab) ────────────────────────────── */
 .prog-log { display: flex; flex-direction: column; gap: 12px; }
@@ -1862,10 +1870,24 @@ function sessionXPFor(sessIndex, completionRatio) {
   return Math.max(0, Math.round(levelBaseXP(getLv()) * clamp01(completionRatio) * roleMult));
 }
 function clamp01(n) { return Math.min(1, Math.max(0, Number(n) || 0)); }
+// Per-day time budget: trailing exercises the user chose to skip today.
+function heldBackIndices(sessIndex, sess) {
+  const tt = S.todayTrim;
+  if (!tt || tt.date !== today() || tt.sess !== sessIndex || !sess || !sess.exercises) return new Set();
+  const held = new Set();
+  for (let last = sess.exercises.length - 1; last >= 2; last--) {
+    if (estimateSessionMinutes(sess.exercises.slice(0, last + 1)) <= tt.minutes) break;
+    held.add(last);
+  }
+  return held;
+}
+
 function sessionCompletionRatio(sessIndex, sess) {
   const checked = S.exerciseChecked || {};
-  const total = (sess.exercises || []).length || 1;
-  const done  = (sess.exercises || []).reduce((n, _, ei) => n + (checked[`${sessIndex}-${ei}`] ? 1 : 0), 0);
+  const held = heldBackIndices(sessIndex, sess);
+  const active = (sess.exercises || []).filter((_, ei) => !held.has(ei));
+  const total = active.length || 1;
+  const done  = (sess.exercises || []).reduce((n, _, ei) => n + (!held.has(ei) && checked[`${sessIndex}-${ei}`] ? 1 : 0), 0);
   return done / total;
 }
 
@@ -1998,9 +2020,11 @@ function filterExercises({ equipment, maxLevel = 'intermediate', muscles = null,
   const eqSet = equipment instanceof Set ? equipment : allowedEquipment(equipment);
   const lvlCeil = levelRank(maxLevel);
   const muSet = muscles ? new Set(muscles) : null;
+  const avoid = new Set(S.avoidExercises || []);   // "this hurts" — never auto-pick
   return _exDB.filter(e =>
     eqSet.has(e.eq) &&
     levelRank(e.level) <= lvlCeil &&
+    !avoid.has(e.id) &&
     (!category || e.cat === category) &&
     (!muSet || e.pm.some(m => muSet.has(m)))
   );
@@ -2176,6 +2200,46 @@ function _advanceNotch(b, ex, doLog) {
     change = 'sets';
   }
   if (doLog) logProgression(ex, change, from, displaySetsFor(ex), 'two easy sessions');
+}
+
+// One step down (mirror of _advanceNotch) — for deloads and post-layoff regression.
+function _deloadNotch(b, ex, trigger) {
+  const from = displaySetsFor(ex);
+  if (b.kind === 'load' && b.load > 0) {
+    b.load = Math.max(0, Math.round((b.load * 0.9) / 2.5) * 2.5);
+  } else if (b.targetReps > b.repRange[0]) {
+    b.targetReps = Math.max(b.repRange[0], b.targetReps - (b.kind === 'timed' ? 5 : 1));
+  } else if (b.sets > 2) {
+    b.sets -= 1;
+    b.targetReps = b.repRange[1];
+  } else {
+    return false;
+  }
+  b.readyStreak = 0; b.struggleStreak = 0;
+  logProgression(ex, 'deload', from, displaySetsFor(ex), trigger || 'eased back');
+  return true;
+}
+
+/* After a long layoff, quietly ease every tracked exercise back one notch on the
+   first return — "shaking off the rust". Fires once per gap. */
+function maybeRegressAfterGap() {
+  if (!S.lastDate || !S.baselines) return;
+  const gap = effectiveGapDays();
+  if (gap < 10) return;
+  if (S.lastRegressFrom === S.lastDate) return;   // already handled this layoff
+  S.lastRegressFrom = S.lastDate;
+  let n = 0;
+  for (const key of Object.keys(S.baselines)) {
+    const b = S.baselines[key];
+    const netUps = (S.progressionLog || []).filter(e => e.key === key && e.change !== 'deload' && e.change !== 'start').length
+                 - (S.progressionLog || []).filter(e => e.key === key && e.change === 'deload').length;
+    if (netUps <= 0) continue;   // nothing to shake off
+    if (_deloadNotch(b, { exId: key.indexOf('name:') === 0 ? null : key, p: key.replace(/^name:/, '') }, `back after ${gap} days off`)) n++;
+  }
+  if (n) {
+    save();
+    toast(`Back after a break — eased ${n} exercise${n === 1 ? '' : 's'} down a notch. Shake off the rust; it comes back fast.`);
+  }
 }
 
 // Net step-ups an exercise has earned so far (advances minus deloads).
@@ -2667,6 +2731,8 @@ let S = {
   workoutLog:      [],     // [{ date, narrativeId, role, entries:[{key,name,feel}] }]
   progressionLog:  [],     // [{ date, key, name, change, from, to, trigger }]
   exerciseFeel:    {},     // { "si-ei": "easy"|"ok"|"hard" } — in-progress feel taps, cleared on complete
+  avoidExercises:  [],     // exIds benched via "something hurts" — never auto-picked
+  todayTrim:       null,   // { date, sess, minutes } — per-day time budget
 };
 
 let curLootFilter = 'all';
@@ -3209,6 +3275,7 @@ function checkStreak() {
   if (!S.lastDate) return;
   if (isPaused()) return;
   if (effectiveGapDays() > 1) S.curStreak = 0;
+  maybeRegressAfterGap();
 }
 
 
@@ -3359,7 +3426,11 @@ async function openExerciseDetail(si, ei) {
       ${ex.h ? `<p class="exd-note" style="margin-top:12px;font-style:normal;color:var(--ink2);font-family:inherit;font-size:12px">${escHtml(withName(ex.h))}</p>` : ''}
       <div class="exd-note" style="margin-top:12px">No detailed guide is available for this exercise.</div>`;
   }
-  card.innerHTML = header + body + `<button class="exd-close" onclick="closeExerciseDetail()">Close</button>`;
+  const benched = ex.exId && (S.avoidExercises || []).includes(ex.exId);
+  const actions = ex.exId ? (benched
+    ? `<button class="exd-danger" style="background:var(--sage4);border-color:var(--sage3);color:var(--sage2)" onclick="unbenchExercise('${ex.exId}')">Un-bench — allow this exercise again</button>`
+    : `<button class="exd-danger" onclick="hurtExercise(${si},${ei})">Something hurts — swap it out & bench it</button>`) : '';
+  card.innerHTML = header + body + actions + `<button class="exd-close" onclick="closeExerciseDetail()">Close</button>`;
 }
 
 /* ── Train tab ──────────────────────────────────────────────── */
@@ -3467,11 +3538,12 @@ function updateCompleteBtn(si) {
   const sess = getSessions()[si];
   if (!sess) return;
   const checked   = S.exerciseChecked || {};
-  const allDone   = sess.exercises.every((_, i) => !!checked[`${si}-${i}`]);
+  const held      = heldBackIndices(si, sess);
+  const allDone   = sess.exercises.every((_, i) => held.has(i) || !!checked[`${si}-${i}`]);
   const doneToday = sessCompletedToday(si);
   btn.disabled    = doneToday || !allDone;
   if (!doneToday) {
-    const rem = sess.exercises.filter((_, i) => !checked[`${si}-${i}`]).length;
+    const rem = sess.exercises.filter((_, i) => !held.has(i) && !checked[`${si}-${i}`]).length;
     btn.innerHTML = allDone
       ? '✦ &nbsp;Mark session complete'
       : `${rem} exercise${rem === 1 ? '' : 's'} left — check off all to complete`;
@@ -3874,6 +3946,84 @@ function addExercise(si) {
   renderWorkoutCard();
 }
 
+// Move a baseline (and its log history) from one exercise key to another.
+function _carryBaseline(oldKey, newKey) {
+  if (!S.baselines || !S.baselines[oldKey] || oldKey === newKey) return;
+  S.baselines[newKey] = S.baselines[oldKey];
+  delete S.baselines[oldKey];
+  for (const e of (S.progressionLog || [])) if (e.key === oldKey) e.key = newKey;
+}
+
+// Swap an exercise for a different movement in the same pattern, keeping progress.
+async function swapExercise(si, ei, opts = {}) {
+  ensureCustomSessions();
+  const sess = S.customSessions[si];
+  const ex = sess && sess.exercises[ei];
+  if (!ex) return;
+  if (!ex.exId) { toast('This is a custom exercise — edit it directly to change it.'); return; }
+  try { await loadExerciseDB(); } catch (_) { toast(EX_DB_ERROR); return; }
+  const rec = exById(ex.exId);
+  if (!rec) { toast('Nothing to swap from — try regenerating the session.'); return; }
+
+  const pat = _exPattern(rec);
+  const used = new Set(sess.exercises.map(e => e.exId).filter(Boolean));
+  const pool = filterExercises({ equipment: (S.prefs || {}).equipment, maxLevel: expLevelCeil((S.prefs || {}).experience) })
+    .filter(e => _exKind(e) === 'strength' && _exPattern(e) === pat && !used.has(e.id) && e.id !== ex.exId);
+  if (!pool.length) { toast('No alternative found for that movement.'); return; }
+  const pick = pool[(Math.random() * pool.length) | 0];
+
+  const oldKey = baselineKey(ex);
+  ex.f = getApiKey() ? (await generateExerciseName(pick.name).catch(() => pick.name)) || pick.name : pick.name;
+  ex.p = pick.name;
+  ex.exId = pick.id;
+  ex.h = (pick.ins || []).slice(0, 2).join(' ');
+  ex.muscles = (pick.pm || []).slice();
+  _carryBaseline(oldKey, baselineKey(ex));
+  save();
+  renderWorkoutCard();
+  toast(opts.silent ? '' : `Swapped in ${pick.name} — your progress carried over.`);
+}
+
+// "This hurts" — bench a movement so it's never auto-picked again, and swap it now.
+async function hurtExercise(si, ei) {
+  const sess = getSessions()[si];
+  const ex = sess && sess.exercises[ei];
+  if (!ex) return;
+  if (!ex.exId) { toast('Custom exercise — just delete or edit it.'); return; }
+  if (!confirm(`Something hurts on "${ex.p}"?\n\nIt'll be swapped for a similar movement now and kept out of future generated workouts. You can un-bench it later from its info sheet.`)) return;
+  if (!S.avoidExercises) S.avoidExercises = [];
+  if (!S.avoidExercises.includes(ex.exId)) S.avoidExercises.push(ex.exId);
+  closeExerciseDetail();
+  await swapExercise(si, ei, { silent: true });
+  toast(`Benched "${ex.p}". Swapped in a similar movement — take it easy.`);
+}
+function unbenchExercise(exId) {
+  S.avoidExercises = (S.avoidExercises || []).filter(id => id !== exId);
+  save();
+  closeExerciseDetail();
+  toast('Un-benched — it can show up in generated workouts again.');
+}
+
+// Per-day time budget: skip the trailing exercises to fit today's window.
+function setTodayTrim() {
+  const sess = getSessions()[curSess];
+  if (!sess) return;
+  const cur = estimateSessionMinutes(sess.exercises);
+  const ans = prompt(`This session is about ${cur} min. How many minutes do you have today?`, String(Math.max(10, Math.round(cur * 0.6))));
+  if (ans === null) return;
+  const m = parseInt(ans, 10);
+  if (!m || m < 5) { toast('Enter a number of minutes (5+).'); return; }
+  if (m >= cur) { clearTodayTrim(); return; }
+  S.todayTrim = { date: today(), sess: curSess, minutes: m };
+  save();
+  renderWorkoutCard();
+}
+function clearTodayTrim() {
+  S.todayTrim = null;
+  save();
+  renderWorkoutCard();
+}
+
 function deleteExercise(si, ei) {
   if (!confirm('Remove this exercise?')) return;
   ensureCustomSessions();
@@ -3893,6 +4043,7 @@ function renderWorkoutCard() {
   const sess    = sessions[curSess];
   const done    = sessCompletedToday(curSess);
   const checked = S.exerciseChecked || {};
+  const held    = heldBackIndices(curSess, sess);
 
   const newEditForm = editingExercise && editingExercise.si === curSess && editingExercise.ei === 'new'
     ? `<li class="ex-item ex-editing">
@@ -3948,13 +4099,16 @@ function renderWorkoutCard() {
         <button class="diff-btn" onclick="adjustDifficulty(${curSess},-1)" title="Fewer reps or easier variations">↓ Dial back</button>
         <button class="diff-btn" onclick="adjustDifficulty(${curSess},+1)" title="More reps or harder variations">↑ Push it</button>
         ${sessions.length > 1 ? `<button class="diff-btn" onclick="deleteSession(${curSess})" title="Delete this day">🗑 Delete</button>` : ''}
+        <button class="diff-btn" onclick="setTodayTrim()" title="Trim this session to fit the time you have today">⏱ Short on time</button>
         `}
       </div>
     </div>
+    ${held.size ? `<div class="trim-banner">Trimmed to ~${estimateSessionMinutes(sess.exercises.filter((_, i) => !held.has(i)))} min for today — ${held.size} held back. <button onclick="clearTodayTrim()">Undo</button></div>` : ''}
     <ul class="ex-list">
       ${sess.exercises.map((e, i) => {
         const key       = `${curSess}-${i}`;
         const isChecked = !!checked[key];
+        const isHeld    = held.has(i);
         const isEditing = editingExercise && editingExercise.si === curSess && editingExercise.ei === i;
         if (isEditing) {
           return `<li class="ex-item ex-editing">
@@ -3974,9 +4128,9 @@ function renderWorkoutCard() {
             </div>
           </li>`;
         }
-        return `<li id="ex-item-${curSess}-${i}" class="ex-item${isChecked ? ' checked' : ''}">
-          <button class="ex-check-btn" onclick="toggleCheck(${curSess},${i})" aria-label="${isChecked ? 'Uncheck' : 'Check'}">
-            <i class="ti ti-${isChecked ? 'circle-check-filled' : 'circle'}"></i>
+        return `<li id="ex-item-${curSess}-${i}" class="ex-item${isChecked ? ' checked' : ''}${isHeld ? ' ex-held' : ''}">
+          <button class="ex-check-btn" onclick="toggleCheck(${curSess},${i})" aria-label="${isChecked ? 'Uncheck' : 'Check'}"${isHeld ? ' title="Held back for today — tap to do it anyway"' : ''}>
+            <i class="ti ti-${isChecked ? 'circle-check-filled' : (isHeld ? 'circle-dashed' : 'circle')}"></i>
           </button>
           <div class="ex-content" style="cursor:pointer" onclick="openExerciseDetail(${curSess},${i})" title="How to do this exercise">
             <div class="ex-fancy">${escHtml(e.f)}</div>
@@ -3988,6 +4142,9 @@ function renderWorkoutCard() {
               <button class="ex-info-btn" onclick="openExerciseDetail(${curSess},${i})" title="How to do this exercise" aria-label="How to do this exercise">
                 <i class="ti ti-info-circle"></i>
               </button>
+              ${e.exId ? `<button class="ex-info-btn" onclick="swapExercise(${curSess},${i})" title="Swap for a similar exercise" aria-label="Swap for a similar exercise">
+                <i class="ti ti-refresh"></i>
+              </button>` : ''}
               <button class="ex-edit-btn" onclick="editExercise(${curSess},${i})" title="Edit">
                 <i class="ti ti-pencil"></i>
               </button>
@@ -4268,11 +4425,12 @@ async function completeSession(i) {
   try { await loadExerciseDB(); } catch (_) { /* kind/muscle detection degrades gracefully */ }
   const checked = S.exerciseChecked || {};
   const feelMap = S.exerciseFeel || {};
+  const heldNow = heldBackIndices(i, sess);
   const logEntries = [];
   const advanced = [];
   let anyDeload = false;
   sess.exercises.forEach((ex, ei) => {
-    if (!checked[`${i}-${ei}`]) return;
+    if (heldNow.has(ei) || !checked[`${i}-${ei}`]) return;
     const feel = feelMap[`${i}-${ei}`] || 'ok';
     const dir  = applyFeel(ex, feel);
     if (dir === 'up')   advanced.push(ex.p || ex.f);
@@ -4283,6 +4441,17 @@ async function completeSession(i) {
   S.workoutLog.push({ date: t, narrativeId: S.activeNarrativeId, role: i, entries: logEntries });
   if (S.workoutLog.length > 300) S.workoutLog = S.workoutLog.slice(-300);
   S.exerciseFeel = {};
+  S.todayTrim = null;   // the per-day time trim is spent
+
+  // a short note for the companions to react to next time they speak
+  const hardN = logEntries.filter(e => e.feel === 'hard').length;
+  const easyN = logEntries.filter(e => e.feel === 'easy').length;
+  S.lastTrainingNote =
+    advanced.length ? `moved up on ${advanced.slice(0, 2).join(' and ')}` :
+    anyDeload       ? `eased back on something — a tough one` :
+    hardN >= 2      ? `a grind — ${hardN} exercises felt tough` :
+    easyN >= 3      ? `felt strong — most of it came easy` :
+    heldNow.size    ? `a short session, trimmed for time` : '';
 
   // Clear checked exercises for this session
   if (S.exerciseChecked) {
@@ -5643,8 +5812,9 @@ async function showCompanionQuip(id) {
     S.level >= 5      ? `reached level ${S.level} — the growth is undeniable`                 : null,
   ].filter(Boolean);
   const milestoneNote = milestones.length ? ` Notable: ${milestones.join('; ')}.` : '';
+  const trainingNote = S.lastTrainingNote ? ` Last session: ${S.lastTrainingNote}.` : '';
 
-  const prompt = `${characterCtx}${loreCtx}\n\nThe hero is ${S.name || 'the hero'}: Lv ${S.level || 1}, session ${S.sessions}, ${S.curStreak}-day streak.${milestoneNote}\n\nIn exactly 2 sentences, say something direct and specific — not generic encouragement, but something that feels earned and particular to where they are right now. Draw on their level, their streak, or story events if available. In-character, in genre, grounded. Tone: ${tone}. Just the dialogue — no attribution, no quotation marks.`;
+  const prompt = `${characterCtx}${loreCtx}\n\nThe hero is ${S.name || 'the hero'}: Lv ${S.level || 1}, session ${S.sessions}, ${S.curStreak}-day streak.${milestoneNote}${trainingNote}\n\nIn exactly 2 sentences, say something direct and specific — not generic encouragement, but something that feels earned and particular to where they are right now. Draw on their level, their streak, their last session, or story events if available. In-character, in genre, grounded. Tone: ${tone}. Just the dialogue — no attribution, no quotation marks.`;
 
   try {
     const text = await callApi([{ role: 'user', content: prompt }], { maxTokens: 100 });
