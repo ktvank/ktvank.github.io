@@ -1408,24 +1408,20 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
     <div class="setting-group">
       <div class="s-sub">Run more than one story at once. Each starts at Level 1 with its own hero, chapters and loot — but your workouts, streak and progress carry across all of them.</div>
       <div class="saves-list" id="narr-list"></div>
-      <div id="narr-new-form" style="display:none;margin-top:8px">
-        <div class="wizard-opt-row" id="narr-genre-row"></div>
-        <div class="wizard-opt-row" id="narr-tone-row" style="margin-top:5px"></div>
-        <input class="s-input" id="narr-name" placeholder="Hero name (optional)" style="margin-top:6px"/>
-        <div style="display:flex;gap:6px;margin-top:6px">
-          <button class="s-btn" onclick="submitNewNarrative()">Create</button>
-          <button class="s-btn" onclick="toggleNewNarrative(false)">Cancel</button>
-        </div>
+      <div id="narr-new-form" style="display:none;margin-top:10px">
+        <div id="narr-new-fields"></div>
       </div>
-      <button class="s-btn" id="narr-new-btn" onclick="toggleNewNarrative(true)" style="margin-top:8px">✦ New narrative</button>
+      <button class="s-btn" id="narr-new-btn" onclick="startNewNarrative()" style="margin-top:8px">✦ New narrative</button>
     </div>
 
-    <div class="sect">Character &amp; World</div>
-    <div class="setting-group">
-      <div class="s-sub" id="char-ed-scope" style="margin-bottom:10px"></div>
-      <div id="char-editor"></div>
-      <div style="font-size:10px;color:var(--ink4);margin-top:14px;line-height:1.6">To redo training setup (experience, equipment, session length) as well, re-run the full wizard.</div>
-      <button class="s-btn" onclick="runWizard()">Re-run full setup wizard</button>
+    <div id="char-ed-block">
+      <div class="sect">Character &amp; World</div>
+      <div class="setting-group">
+        <div class="s-sub" id="char-ed-scope" style="margin-bottom:10px"></div>
+        <div id="char-editor"></div>
+        <div style="font-size:10px;color:var(--ink4);margin-top:14px;line-height:1.6">To redo training setup (experience, equipment, session length) as well, re-run the full wizard.</div>
+        <button class="s-btn" onclick="runWizard()">Re-run full setup wizard</button>
+      </div>
     </div>
 
     <div class="sect">Story Customization</div>
@@ -3035,7 +3031,7 @@ function switchNarrative(id) {
 
 // Create a fresh narrative (new Level 1). Shared core — baselines, streak,
 // body prefs — carries over untouched; only the story skin is new.
-async function createNarrative({ genre, tone, heroClass, name, label }) {
+async function createNarrative({ genre, tone, heroClass, pronouns, vibeNote, personalityNote, name, label }) {
   syncActiveNarrative();
   const id = 'n' + Date.now().toString(36);
 
@@ -3059,6 +3055,10 @@ async function createNarrative({ genre, tone, heroClass, name, label }) {
   else if (genre && !(CLASSES[genre] || []).some(c => c.id === S.prefs.heroClass)) {
     S.prefs.heroClass = (CLASSES[genre] || CLASSES.fantasy)[0].id;  // stale class from prior genre
   }
+  if (pronouns) S.prefs.pronouns = pronouns;
+  // vibe / personality notes: apply what was given, clear if explicitly blank
+  if (vibeNote !== undefined)        S.prefs.vibeNote        = vibeNote;
+  if (personalityNote !== undefined) S.prefs.personalityNote = personalityNote;
 
   S.narratives.push({ id, label: label || (genre || 'Adventure').replace(/^\w/, c => c.toUpperCase()), createdAt: Date.now(), data: snapshotNarrativeData() });
   S.activeNarrativeId = id;
@@ -4821,7 +4821,6 @@ const NARR_TONES = [
   { v: 'dramatic', label: 'Dramatic' },
   { v: 'gentle',   label: 'Gentle' },
 ];
-let _narrNewSel = { genre: 'fantasy', tone: 'humorous' };
 
 function renderNarratives() {
   const el = document.getElementById('narr-list');
@@ -4844,31 +4843,22 @@ function renderNarratives() {
   }).join('');
 }
 
-function toggleNewNarrative(show) {
-  const form = document.getElementById('narr-new-form');
-  const btn  = document.getElementById('narr-new-btn');
-  if (!form || !btn) return;
-  form.style.display = show ? 'block' : 'none';
-  btn.style.display  = show ? 'none' : 'block';
-  if (show) {
-    _narrNewSel = { genre: (S.prefs || {}).genre || 'fantasy', tone: (S.prefs || {}).tone || 'humorous' };
-    const gr = document.getElementById('narr-genre-row');
-    const tr = document.getElementById('narr-tone-row');
-    gr.innerHTML = NARR_GENRES.map(g => `<button class="wizard-opt ${_narrNewSel.genre === g.v ? 'sel' : ''}" onclick="_narrPick('genre','${g.v}',this)">${g.label}</button>`).join('');
-    tr.innerHTML = NARR_TONES.map(t => `<button class="wizard-opt ${_narrNewSel.tone === t.v ? 'sel' : ''}" onclick="_narrPick('tone','${t.v}',this)">${t.label}</button>`).join('');
-    const nm = document.getElementById('narr-name'); if (nm) nm.value = '';
-  }
-}
-function _narrPick(field, val, btn) {
-  _narrNewSel[field] = val;
-  btn.parentElement.querySelectorAll('.wizard-opt').forEach(b => b.classList.remove('sel'));
-  btn.classList.add('sel');
-}
 async function submitNewNarrative() {
-  const name = ((document.getElementById('narr-name') || {}).value || '').trim();
-  toggleNewNarrative(false);
+  const d = _ceDraft || _ceSeedFromActive();
+  const heroClass = (d.heroClass || '').trim() || (CLASSES[d.genre] || CLASSES.fantasy)[0].id;
+  _ceMode = 'edit';
+  _ceCreateChrome(false);
   toast('Weaving a new narrative…');
-  await createNarrative({ genre: _narrNewSel.genre, tone: _narrNewSel.tone, name });
+  await createNarrative({
+    genre:           d.genre,
+    tone:            d.tone,
+    heroClass,
+    pronouns:        d.pronouns,
+    vibeNote:        (d.vibeNote || '').trim(),
+    personalityNote: (d.personalityNote || '').trim(),
+    name:            (d.name || '').trim(),
+    label:           (d.label || '').trim(),
+  });
   renderNarratives();
 }
 
@@ -6531,28 +6521,40 @@ function saveNagFreq(n, btn) {
   updateNotifUI();
 }
 
-/* ── Per-narrative Character & World editor (Options → Narratives) ──
-   Edits the ACTIVE narrative's skin only: name, story label, pronouns,
-   genre, tone, class. Exercise/training setup is shared and stays in
-   the wizard / Workout tab. */
+/* ── Narrative skin editor (Options → Narratives) ──────────────────
+   One form, two modes:
+   • 'edit'   — change the ACTIVE narrative's skin in place.
+   • 'create' — full setup for a brand-new narrative (starts at Lv 1),
+                even while another narrative is active.
+   Fields: hero name, story label, pronouns, genre, tone, class
+   (+ custom), and — create mode only — world vibe / personality notes.
+   Exercise / training setup is shared and stays in the wizard. */
 let _ceDraft = null;
+let _ceMode  = 'edit';
+
+function _ceSeedFromActive() {
+  const p = S.prefs || {};
+  const genre   = p.genre || 'fantasy';
+  const classes = CLASSES[genre] || CLASSES.fantasy;
+  return {
+    name:            heroName(),
+    label:           '',
+    pronouns:        p.pronouns || 'she',
+    genre,
+    tone:            p.tone || 'humorous',
+    heroClass:       p.heroClass || classes[0].id,
+    vibeNote:        p.vibeNote || '',
+    personalityNote: p.personalityNote || '',
+  };
+}
 
 function renderCharIdentity() {
+  if (_ceMode === 'create') { _ceRender(); return; }  // don't clobber a create-in-progress
   const el = document.getElementById('char-editor');
   if (!el) return;
-  const p = S.prefs || {};
   const n = activeNarrative();
-  const genre = p.genre || 'fantasy';
-  const classes = CLASSES[genre] || CLASSES.fantasy;
-  let heroClass = p.heroClass || classes[0].id;
-  _ceDraft = {
-    name:      heroName(),
-    label:     n ? narrativeLabel(n) : 'Narrative',
-    pronouns:  p.pronouns || 'she',
-    genre,
-    tone:      p.tone || 'humorous',
-    heroClass,
-  };
+  _ceDraft = _ceSeedFromActive();
+  _ceDraft.label = n ? narrativeLabel(n) : 'Narrative';
   const scope = document.getElementById('char-ed-scope');
   if (scope) scope.textContent = n
     ? `Editing “${narrativeLabel(n)}”. Each narrative keeps its own hero and world; your training carries across all of them.`
@@ -6560,8 +6562,35 @@ function renderCharIdentity() {
   _ceRender();
 }
 
+// Open the full "new narrative" form (works with an active narrative running).
+function startNewNarrative() {
+  _ceMode  = 'create';
+  _ceDraft = _ceSeedFromActive();
+  _ceDraft.name  = '';
+  _ceDraft.label = '';
+  _ceCreateChrome(true);
+  _ceRender();
+}
+
+function cancelNewNarrative() {
+  _ceMode = 'edit';
+  _ceCreateChrome(false);
+  renderCharIdentity();
+}
+
+// Show only the create form (hide the in-place editor) while creating, and back.
+function _ceCreateChrome(creating) {
+  const form  = document.getElementById('narr-new-form');
+  const btn   = document.getElementById('narr-new-btn');
+  const block = document.getElementById('char-ed-block');
+  if (form)  form.style.display  = creating ? 'block' : 'none';
+  if (btn)   btn.style.display   = creating ? 'none'  : 'block';
+  if (block) block.style.display = creating ? 'none'  : '';
+}
+
 function _ceRender() {
-  const el = document.getElementById('char-editor');
+  const create = _ceMode === 'create';
+  const el = document.getElementById(create ? 'narr-new-fields' : 'char-editor');
   if (!el || !_ceDraft) return;
   const d = _ceDraft;
   const classes = CLASSES[d.genre] || CLASSES.fantasy;
@@ -6569,12 +6598,14 @@ function _ceRender() {
   const pron = [['she', 'She / Her'], ['he', 'He / Him'], ['they', 'They / Them']];
   const opt = (on, oc, label) => `<button class="wizard-opt ${on ? 'sel' : ''}" onclick="${oc}">${label}</button>`;
   el.innerHTML = `
-    <label class="wizard-field-label">Hero's name</label>
-    <input class="s-input" id="ce-name" type="text" maxlength="40" value="${escHtml(d.name)}"
+    <label class="wizard-field-label">Hero's name${create ? ' <span style="opacity:.6;font-size:10px">(optional)</span>' : ''}</label>
+    <input class="s-input" type="text" maxlength="40" value="${escHtml(d.name)}"
+      placeholder="${create ? 'Name your hero…' : ''}"
       oninput="_ceDraft.name=this.value" style="margin-top:4px"/>
 
     <label class="wizard-field-label" style="margin-top:12px">Story name <span style="opacity:.6;font-size:10px">(shown in your narratives list)</span></label>
-    <input class="s-input" id="ce-label" type="text" maxlength="40" value="${escHtml(d.label)}"
+    <input class="s-input" type="text" maxlength="40" value="${escHtml(d.label)}"
+      placeholder="${create ? d.genre.replace(/^\w/, c => c.toUpperCase()) : ''}"
       oninput="_ceDraft.label=this.value" style="margin-top:4px"/>
 
     <label class="wizard-field-label" style="margin-top:12px">Pronouns</label>
@@ -6597,16 +6628,31 @@ function _ceRender() {
       ${classes.map(c => opt(!isCustomClass && d.heroClass === c.id, `_ceSet('heroClass','${c.id}')`, `${c.icon} ${c.label}`)).join('')}
       ${opt(isCustomClass, `_ceSet('heroClass','__custom__')`, '✦ Custom')}
     </div>
-    <div id="ce-class-custom" style="display:${isCustomClass ? '' : 'none'};margin-top:8px">
+    <div style="display:${isCustomClass ? '' : 'none'};margin-top:8px">
       <input class="s-input" id="ce-class-custom-in" type="text" maxlength="24"
         placeholder="e.g. Scholar, Wanderer, Chef…" value="${isCustomClass ? escHtml(d.heroClass) : ''}"
         oninput="_ceDraft.heroClass=this.value" style="margin-top:0"/>
     </div>
+    ${create ? `
+    <label class="wizard-field-label" style="margin-top:12px">World vibe <span style="opacity:.6;font-size:10px">(optional)</span></label>
+    <textarea class="s-input" placeholder="e.g. darker tone, more gothic, add steampunk elements…"
+      oninput="_ceDraft.vibeNote=this.value" style="margin-top:4px">${escHtml(d.vibeNote || '')}</textarea>
 
+    <label class="wizard-field-label" style="margin-top:10px">Hero's personality <span style="opacity:.6;font-size:10px">(optional)</span></label>
+    <textarea class="s-input" placeholder="e.g. brutally honest, speak like a ship captain, more tough love…"
+      oninput="_ceDraft.personalityNote=this.value" style="margin-top:4px">${escHtml(d.personalityNote || '')}</textarea>
+
+    <div class="s-sub" style="margin-top:12px;font-style:italic;line-height:1.6">
+      Starts at Level 1 with its own story, loot and companions. Your streak, calendar and training progress carry across every narrative.
+    </div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="s-btn" onclick="submitNewNarrative()">Create narrative</button>
+      <button class="s-btn" onclick="cancelNewNarrative()">Cancel</button>
+    </div>` : `
     <div class="s-sub" style="margin-top:12px;font-style:italic;line-height:1.6">
       On save, genre and tone change the interface, sounds and portrait style. Chapters and loot already written stay as they are — new chapters and the next arc pick up the change. Portraits keep their current look until you regenerate them.
     </div>
-    <button class="s-btn" style="margin-top:10px" onclick="saveCharEditor()">Save character &amp; world</button>`;
+    <button class="s-btn" style="margin-top:10px" onclick="saveCharEditor()">Save character &amp; world</button>`}`;
 }
 
 function _ceSet(key, val) {
