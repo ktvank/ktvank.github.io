@@ -606,9 +606,6 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 .s-btn.danger          { background: var(--rose4); border-color: var(--rose3); color: var(--rose2); }
 .s-btn.danger:hover    { background: var(--rose3); }
 .s-btn:disabled        { opacity: .5; cursor: default; }
-.char-identity { display: grid; grid-template-columns: 80px 1fr; gap: 5px 10px; align-items: baseline; }
-.char-identity .ci-lbl { font-size: 10px; color: var(--ink4); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; padding-top: 1px; }
-.char-identity .ci-val { font-size: 13px; color: var(--ink2); }
 .notif-st { font-size: 10px; color: var(--ink3); margin-top: 6px; font-style: italic; }
 .dot      { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
 .dot-ok   { background: var(--sage2); }
@@ -1423,11 +1420,12 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
       <button class="s-btn" id="narr-new-btn" onclick="toggleNewNarrative(true)" style="margin-top:8px">✦ New narrative</button>
     </div>
 
-    <div class="sect">Character</div>
+    <div class="sect">Character &amp; World</div>
     <div class="setting-group">
-      <div class="char-identity" id="char-identity"></div>
-      <div style="font-size:10px;color:var(--ink4);margin-top:10px;line-height:1.6">Set during character creation.</div>
-      <button class="s-btn" onclick="runWizard()">Re-run setup wizard</button>
+      <div class="s-sub" id="char-ed-scope" style="margin-bottom:10px"></div>
+      <div id="char-editor"></div>
+      <div style="font-size:10px;color:var(--ink4);margin-top:14px;line-height:1.6">To redo training setup (experience, equipment, session length) as well, re-run the full wizard.</div>
+      <button class="s-btn" onclick="runWizard()">Re-run full setup wizard</button>
     </div>
 
     <div class="sect">Story Customization</div>
@@ -2954,7 +2952,7 @@ const NARRATIVE_FIELDS = [
 // one body and one training day, so "done today" must hold across every narrative
 // (otherwise the same real workout could be re-completed in each story).
 // prefs sub-keys that belong to the narrative skin (the rest of prefs is core).
-const NARRATIVE_PREFS = ['genre', 'tone', 'heroClass', 'vibeNote', 'personalityNote'];
+const NARRATIVE_PREFS = ['genre', 'tone', 'heroClass', 'pronouns', 'vibeNote', 'personalityNote'];
 
 function _clone(v) { try { return JSON.parse(JSON.stringify(v)); } catch (_) { return v; } }
 
@@ -3003,7 +3001,17 @@ function migrateNarratives() {
   }
   if (!S.benched) S.benched = {};
   if (!S.trainingGoal) S.trainingGoal = 'build';
-  S.schema = 4;
+  // schema 5: pronouns became a per-narrative pref — backfill each slot from the
+  // old shared value so switching narratives doesn't carry a stale pronoun.
+  if ((S.schema || 0) < 5) {
+    const shared = (S.prefs || {}).pronouns || 'she';
+    for (const n of S.narratives) {
+      if (!n.data) continue;
+      if (!n.data._prefs) n.data._prefs = {};
+      if (n.data._prefs.pronouns === undefined) n.data._prefs.pronouns = shared;
+    }
+  }
+  S.schema = 5;
 }
 
 function narrativeLabel(n) {
@@ -3048,6 +3056,9 @@ async function createNarrative({ genre, tone, heroClass, name, label }) {
   if (genre) S.prefs.genre = genre;
   if (tone) S.prefs.tone = tone;
   if (heroClass) S.prefs.heroClass = heroClass;
+  else if (genre && !(CLASSES[genre] || []).some(c => c.id === S.prefs.heroClass)) {
+    S.prefs.heroClass = (CLASSES[genre] || CLASSES.fantasy)[0].id;  // stale class from prior genre
+  }
 
   S.narratives.push({ id, label: label || (genre || 'Adventure').replace(/^\w/, c => c.toUpperCase()), createdAt: Date.now(), data: snapshotNarrativeData() });
   S.activeNarrativeId = id;
@@ -6520,22 +6531,134 @@ function saveNagFreq(n, btn) {
   updateNotifUI();
 }
 
+/* ── Per-narrative Character & World editor (Options → Narratives) ──
+   Edits the ACTIVE narrative's skin only: name, story label, pronouns,
+   genre, tone, class. Exercise/training setup is shared and stays in
+   the wizard / Workout tab. */
+let _ceDraft = null;
+
 function renderCharIdentity() {
-  const el = document.getElementById('char-identity');
+  const el = document.getElementById('char-editor');
   if (!el) return;
   const p = S.prefs || {};
+  const n = activeNarrative();
   const genre = p.genre || 'fantasy';
-  const classData = getClassData(genre, p.heroClass);
-  const pronounMap = { she: 'She / Her', he: 'He / Him', they: 'They / Them' };
-  const genreLabel = genre.charAt(0).toUpperCase() + genre.slice(1);
-  const toneLabel  = { humorous: 'Humorous', dramatic: 'Dramatic', gentle: 'Gentle' };
-  const tone = p.tone || 'humorous';
+  const classes = CLASSES[genre] || CLASSES.fantasy;
+  let heroClass = p.heroClass || classes[0].id;
+  _ceDraft = {
+    name:      heroName(),
+    label:     n ? narrativeLabel(n) : 'Narrative',
+    pronouns:  p.pronouns || 'she',
+    genre,
+    tone:      p.tone || 'humorous',
+    heroClass,
+  };
+  const scope = document.getElementById('char-ed-scope');
+  if (scope) scope.textContent = n
+    ? `Editing “${narrativeLabel(n)}”. Each narrative keeps its own hero and world; your training carries across all of them.`
+    : '';
+  _ceRender();
+}
+
+function _ceRender() {
+  const el = document.getElementById('char-editor');
+  if (!el || !_ceDraft) return;
+  const d = _ceDraft;
+  const classes = CLASSES[d.genre] || CLASSES.fantasy;
+  const isCustomClass = !classes.find(c => c.id === d.heroClass);
+  const pron = [['she', 'She / Her'], ['he', 'He / Him'], ['they', 'They / Them']];
+  const opt = (on, oc, label) => `<button class="wizard-opt ${on ? 'sel' : ''}" onclick="${oc}">${label}</button>`;
   el.innerHTML = `
-    <span class="ci-lbl">Name</span>     <span class="ci-val">${heroName()}</span>
-    <span class="ci-lbl">Pronouns</span> <span class="ci-val">${pronounMap[p.pronouns || 'she'] || p.pronouns}</span>
-    <span class="ci-lbl">Class</span>    <span class="ci-val">${classData.icon} ${classData.label}</span>
-    <span class="ci-lbl">Genre</span>    <span class="ci-val">${genreLabel}</span>
-    <span class="ci-lbl">Tone</span>     <span class="ci-val">${toneLabel[tone] || tone}</span>`;
+    <label class="wizard-field-label">Hero's name</label>
+    <input class="s-input" id="ce-name" type="text" maxlength="40" value="${escHtml(d.name)}"
+      oninput="_ceDraft.name=this.value" style="margin-top:4px"/>
+
+    <label class="wizard-field-label" style="margin-top:12px">Story name <span style="opacity:.6;font-size:10px">(shown in your narratives list)</span></label>
+    <input class="s-input" id="ce-label" type="text" maxlength="40" value="${escHtml(d.label)}"
+      oninput="_ceDraft.label=this.value" style="margin-top:4px"/>
+
+    <label class="wizard-field-label" style="margin-top:12px">Pronouns</label>
+    <div class="wizard-opt-row">
+      ${pron.map(([v, l]) => opt(d.pronouns === v, `_ceSet('pronouns','${v}')`, l)).join('')}
+    </div>
+
+    <label class="wizard-field-label" style="margin-top:12px">Genre</label>
+    <div class="wizard-opt-group">
+      ${NARR_GENRES.map(g => opt(d.genre === g.v, `_ceSetGenre('${g.v}')`, g.label)).join('')}
+    </div>
+
+    <label class="wizard-field-label" style="margin-top:12px">Tone</label>
+    <div class="wizard-opt-row">
+      ${NARR_TONES.map(t => opt(d.tone === t.v, `_ceSet('tone','${t.v}')`, t.label)).join('')}
+    </div>
+
+    <label class="wizard-field-label" style="margin-top:12px">Class</label>
+    <div class="wizard-opt-group">
+      ${classes.map(c => opt(!isCustomClass && d.heroClass === c.id, `_ceSet('heroClass','${c.id}')`, `${c.icon} ${c.label}`)).join('')}
+      ${opt(isCustomClass, `_ceSet('heroClass','__custom__')`, '✦ Custom')}
+    </div>
+    <div id="ce-class-custom" style="display:${isCustomClass ? '' : 'none'};margin-top:8px">
+      <input class="s-input" id="ce-class-custom-in" type="text" maxlength="24"
+        placeholder="e.g. Scholar, Wanderer, Chef…" value="${isCustomClass ? escHtml(d.heroClass) : ''}"
+        oninput="_ceDraft.heroClass=this.value" style="margin-top:0"/>
+    </div>
+
+    <div class="s-sub" style="margin-top:12px;font-style:italic;line-height:1.6">
+      On save, genre and tone change the interface, sounds and portrait style. Chapters and loot already written stay as they are — new chapters and the next arc pick up the change. Portraits keep their current look until you regenerate them.
+    </div>
+    <button class="s-btn" style="margin-top:10px" onclick="saveCharEditor()">Save character &amp; world</button>`;
+}
+
+function _ceSet(key, val) {
+  if (!_ceDraft) return;
+  _ceDraft[key] = val;
+  if (key === 'heroClass' && val === '__custom__') _ceDraft.heroClass = '';
+  _ceRender();
+  if (key === 'heroClass' && val === '__custom__') {
+    const i = document.getElementById('ce-class-custom-in');
+    if (i) i.focus();
+  }
+}
+
+function _ceSetGenre(val) {
+  if (!_ceDraft) return;
+  _ceDraft.genre = val;
+  const classes = CLASSES[val] || CLASSES.fantasy;
+  if (!classes.find(c => c.id === _ceDraft.heroClass) && _ceDraft.heroClass !== '') {
+    _ceDraft.heroClass = classes[0].id;   // reset only if it wasn't a custom write
+  }
+  _ceRender();   // theme/sounds change on Save, not before
+}
+
+function saveCharEditor() {
+  if (!_ceDraft) return;
+  if (!S.prefs) S.prefs = {};
+  const d = _ceDraft;
+  const prevGenre = S.prefs.genre;
+
+  const nm = (d.name || '').trim();
+  if (nm) S.name = nm;
+
+  S.prefs.pronouns  = d.pronouns;
+  S.prefs.genre     = d.genre;
+  S.prefs.tone      = d.tone;
+  S.prefs.heroClass = (d.heroClass || '').trim() ||
+    (CLASSES[d.genre] || CLASSES.fantasy)[0].id;
+
+  const n = activeNarrative();
+  if (n) {
+    const lbl = (d.label || '').trim();
+    n.label = lbl || d.genre.replace(/^\w/, c => c.toUpperCase());
+  }
+
+  applyGenreTheme(S.prefs.genre);
+  applyDarkMode();
+  save();
+  renderAll();
+  Object.keys(_quipCache || {}).forEach(k => delete _quipCache[k]);
+  toast(prevGenre !== S.prefs.genre
+    ? 'Character & world updated — new genre applies from the next chapter.'
+    : 'Character & world updated.');
 }
 
 function populateCustomizationFields() {
