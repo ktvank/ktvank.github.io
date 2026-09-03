@@ -373,6 +373,12 @@ body {
 
 .ex-meta  { display: flex; align-items: center; gap: 6px; padding-top: 2px; }
 .ex-chevron { color: var(--ink4); font-size: 16px; cursor: pointer; flex-shrink: 0; }
+.ex-wt-hint {
+  flex-shrink: 0; padding: 2px 7px; border-radius: 999px; cursor: pointer;
+  font-size: 10px; font-family: var(--font-mono); white-space: nowrap;
+  border: 1px dashed var(--sage3); background: none; color: var(--sage2);
+}
+.ex-wt-hint:hover { background: var(--parch2); }
 
 .ex-feel { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 7px; padding-left: 42px; }
 .ex-feel-q { font-size: 10px; color: var(--ink4); font-style: italic; }
@@ -780,6 +786,22 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 }
 .exd-act-btn:hover { background: var(--parch3); }
 .exd-act-btn.warn { background: var(--rose4); border-color: var(--rose3); color: var(--rose2); }
+
+/* weight tracking in the detail sheet */
+.exd-weight { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--parch4); }
+.exd-weight-lbl { font-family: var(--font-display); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink3); }
+.exd-weight-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.exd-w-step {
+  width: 34px; height: 34px; flex: none; border-radius: var(--radius); cursor: pointer;
+  border: 1px solid var(--parch4); background: var(--parch2); color: var(--ink2); font-size: 18px; line-height: 1;
+}
+.exd-w-step:hover { background: var(--parch3); }
+.exd-w-in {
+  width: 90px; padding: 8px; text-align: center; font-size: 15px; font-family: var(--font-mono);
+  border: 1px solid var(--parch4); border-radius: var(--radius); background: var(--parch1); color: var(--ink1);
+}
+.exd-w-unit { font-size: 12px; color: var(--ink3); font-family: var(--font-mono); }
+.exd-recent { margin: 6px 0 0; padding-left: 16px; font-size: 11px; color: var(--ink3); line-height: 1.7; font-family: var(--font-mono); }
 
 /* ── PASSPHRASE LOCK ─────────────────────────────────────────── */
 .lock-overlay {
@@ -1486,6 +1508,13 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
           <div class="s-sub">Generate a picture for your hero and each companion via a free public image service (pollinations.ai). Falls back to the class icon. Character names/descriptions are sent to that service.</div>
         </div>
         <button class="s-btn" id="portraits-btn" onclick="togglePortraits(this)" style="min-width:52px"></button>
+      </div>
+      <div class="s-row" style="margin-top:14px">
+        <div>
+          <div class="s-lbl">Weight unit</div>
+          <div class="s-sub">Label shown for weighted exercises. Switching does not convert numbers you've already entered.</div>
+        </div>
+        <button class="s-btn" id="wunit-btn" onclick="toggleWeightUnit(this)" style="min-width:52px"></button>
       </div>
     </div>
 
@@ -2378,7 +2407,7 @@ function ensureBaseline(ex) {
     kind, sets: spec.sets,
     repRange: kind === 'timed' ? [spec.lo, spec.lo + 30] : [spec.lo, spec.hi],
     targetReps: spec.lo,
-    load: kind === 'load' ? (ex.load || 0) : null, unit: 'lb',
+    load: kind === 'load' ? (ex.load || 0) : null, unit: weightUnit(),
     lower,
     readyStreak: 0, struggleStreak: 0,
     startedAt: today(),
@@ -2408,6 +2437,56 @@ function logProgression(ex, change, from, to, trigger) {
   if (!S.progressionLog) S.progressionLog = [];
   S.progressionLog.push({ date: today(), key: baselineKey(ex), name: ex.p || ex.f || 'Exercise', change, from, to, trigger });
   if (S.progressionLog.length > 400) S.progressionLog = S.progressionLog.slice(-400);
+}
+
+function weightUnit() { return (S.prefs && S.prefs.weightUnit) || 'lb'; }
+
+// Set the working weight the user actually lifts for an exercise. Rounds to a
+// 2.5-unit step; folds same-day manual edits into one progression-log line.
+function setExerciseLoad(si, ei, val) {
+  const sess = getSessions()[si];
+  const ex = sess && sess.exercises[ei];
+  if (!ex) return;
+  const b = ensureBaseline(ex);
+  let n = parseFloat(val);
+  if (!isFinite(n) || n < 0) n = 0;
+  n = Math.round(n / 2.5) * 2.5;
+  if (n === (b.load || 0)) { const inp = document.getElementById('exd-w-in'); if (inp) inp.value = b.load || 0; return; }
+  const from = displaySetsFor(ex);
+  if (b.kind !== 'load') b.kind = 'load';
+  b.load = n;
+  b.unit = b.unit || weightUnit();
+  b.readyStreak = 0; b.struggleStreak = 0;   // manual number resets the feel run
+  const log = S.progressionLog || (S.progressionLog = []);
+  const last = log[log.length - 1];
+  if (last && last.key === baselineKey(ex) && last.change === 'weight' && last.date === today()) {
+    last.to = displaySetsFor(ex);            // keep dialing in as one entry
+  } else {
+    logProgression(ex, 'weight', from, displaySetsFor(ex), 'you set the weight');
+  }
+  save();
+  renderWorkoutCard();
+  const inp = document.getElementById('exd-w-in'); if (inp) inp.value = b.load;
+}
+
+function bumpExerciseLoad(si, ei, dir) {
+  const sess = getSessions()[si];
+  const ex = sess && sess.exercises[ei];
+  if (!ex) return;
+  const b = ensureBaseline(ex);
+  setExerciseLoad(si, ei, (b.load || 0) + dir * loadIncrement(b));
+}
+
+function toggleWeightUnit(btn) {
+  if (!S.prefs) S.prefs = {};
+  S.prefs.weightUnit = weightUnit() === 'kg' ? 'lb' : 'kg';
+  for (const k in (S.baselines || {})) {
+    if (S.baselines[k] && S.baselines[k].kind === 'load') S.baselines[k].unit = S.prefs.weightUnit;
+  }
+  save();
+  if (btn) btn.textContent = S.prefs.weightUnit;
+  renderWorkoutCard();
+  toast('Weight unit: ' + S.prefs.weightUnit + ' (existing numbers unchanged)');
 }
 
 // Apply one session's feel to an exercise. Returns 'up' | 'down' | null.
@@ -3590,6 +3669,40 @@ async function openExerciseDetail(si, ei) {
       ${ex.h ? `<p class="exd-note" style="margin-top:12px;font-style:normal;color:var(--ink2);font-family:inherit;font-size:12px">${escHtml(withName(ex.h))}</p>` : ''}
       <div class="exd-note" style="margin-top:12px">No detailed guide is available for this exercise.</div>`;
   }
+  // ── working-weight tracker (weighted / custom non-timed moves) ──
+  const exKind = ex.exId ? exKindFor(ex) : (parseHoldSec(ex.sets) > 0 ? 'timed' : 'load');
+  const bNow   = getBaseline(ex);
+  const canWeight = exKind === 'load' || (bNow && bNow.kind === 'load') || (!ex.exId && exKind !== 'timed');
+  let weightBlock = '';
+  if (canWeight) {
+    const b = ensureBaseline(ex);
+    if (b.kind !== 'load') b.kind = 'load';
+    const u = b.unit || weightUnit();
+    const step = loadIncrement(b);
+    const k = baselineKey(ex);
+    const recent = (S.workoutLog || [])
+      .filter(w => (w.entries || []).some(e => e.key === k && e.did))
+      .slice(-3).reverse()
+      .map(w => {
+        const e = w.entries.find(x => x.key === k);
+        const d = e.did || {};
+        const wt = d.load ? `${d.load} ${d.unit || u}` : 'bodyweight';
+        const fl = e.feel && e.feel !== 'ok' ? ` · ${String(FEEL_LABELS[e.feel] || e.feel).toLowerCase()}` : '';
+        return `<li>${escHtml(w.date)} — ${wt} × ${d.reps ?? b.targetReps}${fl}</li>`;
+      }).join('');
+    weightBlock = `<div class="exd-weight">
+      <div class="exd-weight-lbl">Working weight</div>
+      <div class="exd-weight-row">
+        <button class="exd-w-step" aria-label="less" onclick="bumpExerciseLoad(${si},${ei},-1)">−</button>
+        <input class="exd-w-in" id="exd-w-in" type="number" inputmode="decimal" min="0" step="${step}"
+          value="${b.load || 0}" onchange="setExerciseLoad(${si},${ei},this.value)">
+        <span class="exd-w-unit">${u}</span>
+        <button class="exd-w-step" aria-label="more" onclick="bumpExerciseLoad(${si},${ei},1)">+</button>
+      </div>
+      ${recent ? `<div class="exd-note" style="margin-top:8px">Recent</div><ul class="exd-recent">${recent}</ul>` : ''}
+    </div>`;
+  }
+
   const benched = ex.exId && isBenched(ex.exId);
   const bInfo = ex.exId && (S.benched || {})[ex.exId];
   const actions = `<div class="exd-actions">
@@ -3601,7 +3714,7 @@ async function openExerciseDetail(si, ei) {
          <button class="exd-act-btn" onclick="unbenchExercise('${ex.exId}')"><i class="ti ti-arrow-back-up"></i>Bring it back now</button>`
       : `<button class="exd-act-btn warn" onclick="hurtExercise(${si},${ei})"><i class="ti ti-first-aid-kit"></i>Something hurts — rest this move</button>`) : ''}
   </div>`;
-  card.innerHTML = header + body + actions + `<button class="exd-close" onclick="closeExerciseDetail()">Close</button>`;
+  card.innerHTML = header + body + weightBlock + actions + `<button class="exd-close" onclick="closeExerciseDetail()">Close</button>`;
 }
 
 /* ── Train tab ──────────────────────────────────────────────── */
@@ -4408,6 +4521,8 @@ function renderWorkoutCard() {
           </div>
           <div class="ex-meta">
             <div class="ex-sets">${escHtml(displaySetsFor(e))}</div>
+            ${(() => { const _b = getBaseline(e); return _b && _b.kind === 'load' && !(_b.load > 0)
+              ? `<button class="ex-wt-hint" onclick="event.stopPropagation();openExerciseDetail(${curSess},${i})">+ weight</button>` : ''; })()}
             <i class="ti ti-chevron-right ex-chevron" onclick="openExerciseDetail(${curSess},${i})"></i>
           </div>
           ${isChecked ? `<div class="ex-feel" role="group" aria-label="How did that feel?">
@@ -4493,7 +4608,7 @@ function renderProgressionLog() {
   const CAP = 8;
   const groups = _progLogAll ? allGroups : allGroups.slice(0, CAP);
   const fmt = ds => { const [y, m, d] = ds.split('-'); return `${+m}/${+d}`; };
-  const verb = { reps: 'reps up', time: 'longer hold', load: 'load up', sets: 'added a set', deload: 'eased back', start: 'starting point' };
+  const verb = { reps: 'reps up', time: 'longer hold', load: 'load up', weight: 'weight set', sets: 'added a set', deload: 'eased back', start: 'starting point' };
   el.innerHTML = groups.map(rows => `
     <div class="prog-ex">
       <div class="prog-ex-name">${escHtml(rows[rows.length - 1].name)}</div>
@@ -4695,10 +4810,16 @@ async function completeSession(i) {
   sess.exercises.forEach((ex, ei) => {
     if (heldNow.has(ei) || !checked[`${i}-${ei}`]) return;
     const feel = feelMap[`${i}-${ei}`] || 'ok';
+    const b0 = getBaseline(ex);   // what they actually trained at, before this feel advances it
+    const did = b0 ? {
+      sets: b0.sets, reps: b0.targetReps,
+      load: b0.kind === 'load' ? (b0.load || 0) : null,
+      unit: b0.unit || weightUnit(),
+    } : null;
     const dir  = applyFeel(ex, feel);
     if (dir === 'up')   advanced.push(ex.p || ex.f);
     if (dir === 'down') anyDeload = true;
-    logEntries.push({ key: baselineKey(ex), name: ex.p || ex.f, feel });
+    logEntries.push({ key: baselineKey(ex), name: ex.p || ex.f, feel, did });
   });
   if (!S.workoutLog) S.workoutLog = [];
   S.workoutLog.push({ date: t, narrativeId: S.activeNarrativeId, role: i, entries: logEntries });
@@ -6945,6 +7066,8 @@ function renderAppearanceSettings() {
   btn.style.color       = on ? 'var(--sage2)' : '';
   const pbtn = document.getElementById('portraits-btn');
   if (pbtn) pbtn.textContent = portraitsOn() ? 'On' : 'Off';
+  const wbtn = document.getElementById('wunit-btn');
+  if (wbtn) wbtn.textContent = weightUnit();
 }
 
 function sSet(btn) {
