@@ -2277,7 +2277,7 @@ function exKindFor(ex) {
   if (parseHoldSec(ex.sets) > 0) return 'timed';
   const rec = ex.exId ? exById(ex.exId) : null;
   if (rec && rec.force === 'static') return 'timed';
-  if (!rec || rec.eq === 'bodyweight') return 'bodyweight';
+  if (!rec || rec.eq === 'bodyweight' || rec.eq === 'bands') return 'bodyweight';
   return 'load';
 }
 // "2 × 8–12" / "3 × 30s" → { sets, lo, hi }
@@ -2315,7 +2315,9 @@ function _advanceNotch(b, ex, doLog, trigger) {
 function _deloadNotch(b, ex, trigger) {
   const from = displaySetsFor(ex);
   if (b.kind === 'load' && b.load > 0) {
-    b.load = Math.max(0, Math.round((b.load * 0.9) / 2.5) * 2.5);
+    const step = loadIncrement(b);                       // drop ~10%, at least one plate, snapped to it
+    const cut  = Math.max(step, Math.round((b.load * 0.10) / step) * step);
+    b.load = Math.max(0, b.load - cut);
   } else if (b.targetReps > b.repRange[0]) {
     b.targetReps = Math.max(b.repRange[0], b.targetReps - (b.kind === 'timed' ? 5 : 1));
   } else if (b.sets > 2) {
@@ -2398,7 +2400,13 @@ function seedBaselineFromPeers(ex, b) {
 function ensureBaseline(ex) {
   if (!S.baselines) S.baselines = {};
   const key = baselineKey(ex);
-  if (S.baselines[key]) return S.baselines[key];
+  if (S.baselines[key]) {
+    const eb = S.baselines[key];
+    if (eb.kind === 'load' && !eb.eq && ex.exId) {           // backfill equipment for older baselines
+      const r = exById(ex.exId); if (r) eb.eq = r.eq;
+    }
+    return eb;
+  }
   const rec  = ex.exId ? exById(ex.exId) : null;
   const kind = exKindFor(ex);
   const spec = parseSetsSpec(ex.sets);
@@ -2408,6 +2416,7 @@ function ensureBaseline(ex) {
     repRange: kind === 'timed' ? [spec.lo, spec.lo + 30] : [spec.lo, spec.hi],
     targetReps: spec.lo,
     load: kind === 'load' ? (ex.load || 0) : null, unit: weightUnit(),
+    eq: rec ? rec.eq : null,
     lower,
     readyStreak: 0, struggleStreak: 0,
     startedAt: today(),
@@ -2427,11 +2436,18 @@ function displaySetsFor(ex) {
   return `${b.sets} × ${b.targetReps}`;
 }
 
+/* Real-world smallest practical jump per equipment type — machines and stacks
+   step in fixed amounts, not a percentage. Lower-body barbell lifts get the
+   bigger jump. Values per display unit. */
+const LOAD_STEPS = {
+  lb: { barbell: 5, dumbbells: 5, cable: 10, machine: 10, kettlebells: 10, _: 5 },
+  kg: { barbell: 2.5, dumbbells: 2, cable: 5, machine: 5, kettlebells: 4, _: 2.5 },
+};
 function loadIncrement(b) {
-  if (!b.load || b.load <= 0) return b.lower ? 10 : 5;
-  const step = b.load >= 40 ? 5 : 2.5;
-  const raw  = b.load * (b.lower ? 0.075 : 0.05);
-  return Math.max(step, Math.round(raw / step) * step);
+  const tbl  = LOAD_STEPS[b.unit === 'kg' ? 'kg' : 'lb'];
+  let step   = tbl[b.eq] || tbl._;
+  if (b.lower && b.eq === 'barbell') step *= 2;   // 10 lb / 5 kg on squats, deadlifts, etc.
+  return step;
 }
 function logProgression(ex, change, from, to, trigger) {
   if (!S.progressionLog) S.progressionLog = [];
