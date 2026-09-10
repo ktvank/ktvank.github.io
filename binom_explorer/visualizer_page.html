@@ -17,8 +17,6 @@
       <h1>Historical Binomial Visualizer</h1>
       <p>This tool tracks how often word pairs appear in alphabetical versus reverse-alphabetical order across historical American English text — a measure called <em>ordinality</em>. Shifts in ordinality over time can reflect changes in language, culture, or social context.</p>
       <p>Enter one or more word pairs below to explore their history. Pairs are automatically sorted alphabetically, so <em>left right</em> and <em>right left</em> are treated the same.</p>
-      <p>Read the <a href="paper.org">full description</a> of the dataset and analysis.</p>
-      <p class="download-links">Download: <a href="consolidated_ords.csv" download>full dataset</a> &nbsp;&middot;&nbsp; <a href="uncleaned_data_consolidated_limited.csv" download>filtered dataset</a></p>
     </header>
 
     <!-- Input -->
@@ -226,12 +224,11 @@
         .style("fill", "#c0392b")
         .style("pointer-events", "none");
 
-      const dateParser = d3.timeParse("%Y");
       const formatDate = d3.timeFormat("%Y");
       const formatOrdinality = d3.format(".2f");
 
       tooltip.select("#bin").text(d.bin);
-      tooltip.select("#date").text(formatDate(dateParser(d.date)));
+      tooltip.select("#date").text(formatDate(d.date));
       tooltip.select("#count").text(d.count);
       tooltip.select("#ordinality").text(formatOrdinality(d.ordinality));
 
