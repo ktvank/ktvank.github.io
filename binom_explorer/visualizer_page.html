@@ -35,6 +35,7 @@
       <div id="container" class="svg-container">
         <div id="my_dataviz"></div>
       </div>
+      <div id="legend" class="chart-legend"></div>
     </section>
 
   </div>
@@ -50,29 +51,15 @@
   <!-- Scripts -->
   <script src="https://d3js.org/d3.v5.js"></script>
   <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js" integrity="sha512-wNH6xsp2n8CfB91nrBtfc4sfLwYPBMjSWVUwQOp60AYYXH6i8yCwuKFZ4rgK2i6pQek/b+bSyR7b01/922IBzQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWe8ZBKAJGNjFE6rHnfbe5L7DKc3/w6/ZGvG4p+omEXLDiPida6sNMd2f" crossorigin="anonymous"></script>
 
   <script>
 
-  // set the dimensions and margins of the graph
-  var margin = {top: 10, right: 200, bottom: 30, left: 60},
-      width = 1200 - margin.left - margin.right,
-      height = 800 - margin.top - margin.bottom;
-
-  // append the svg object to the body of the page
-  var svg = d3.select("#my_dataviz")
-    .append("svg")
-      .attr("preserveAspectRatio", "xMinYMin meet")
-      .attr("viewBox", "0 0 1200 1000")
-      .classed("svg-content", true)
-    .append("g")
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-
   const BINOM_INIT = ["(down, up)", "(left, right)", "(backward, forward)"];
+  let currentData = null;
+  let currentLst = BINOM_INIT;
 
   function binToFilename(bin) {
     return bin.replace(/[()]/g, "").replace(", ", "_");
@@ -112,7 +99,8 @@
   document.getElementById("run_graph").addEventListener("click", function() {
     const binoms = parseBinomials(document.getElementById("binomials").value);
     fetchBinomials(binoms).then(function(data) {
-      d3.selectAll("g > *").remove();
+      currentData = data;
+      currentLst = binoms;
       draw_graph(data, binoms);
     });
   });
@@ -125,11 +113,41 @@
   });
 
   fetchBinomials(BINOM_INIT).then(function(data) {
+    currentData = data;
     draw_graph(data, BINOM_INIT);
   });
 
+  let resizeTimer;
+  window.addEventListener("resize", function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() {
+      if (currentData) draw_graph(currentData, currentLst);
+    }, 150);
+  });
 
   function draw_graph(data, lst){
+    // Recompute pixel dimensions from the actual container on every draw so
+    // text stays a fixed, legible CSS-pixel size instead of shrinking along
+    // with a scaled-down viewBox on narrow (mobile) screens.
+    const containerEl = document.getElementById("container");
+    const totalWidth = containerEl.clientWidth;
+    const isMobile = totalWidth < 576;
+    const margin = {top: 16, right: 16, bottom: isMobile ? 46 : 36, left: isMobile ? 38 : 50};
+    const totalHeight = Math.max(260, Math.min(totalWidth * (isMobile ? 0.9 : 0.6), 560));
+    const width = totalWidth - margin.left - margin.right;
+    const height = totalHeight - margin.top - margin.bottom;
+
+    d3.select("#my_dataviz").selectAll("*").remove();
+
+    const svg = d3.select("#my_dataviz")
+      .append("svg")
+        .attr("width", totalWidth)
+        .attr("height", totalHeight)
+        .attr("viewBox", "0 0 " + totalWidth + " " + totalHeight)
+        .classed("svg-content", true)
+      .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
     var sorted_data = data.slice().sort(function(a,b) {return +a.date - +b.date})
     var df = lst.map(function(grpName) {
       return {
@@ -150,7 +168,7 @@
     svg.append("g")
       .attr("transform", "translate(0," + height + ")")
       .attr("class", "axis")
-      .call(d3.axisBottom(x));
+      .call(d3.axisBottom(x).ticks(isMobile ? 5 : 10));
 
     // Add Y axis
     var y = d3.scaleLinear()
@@ -159,7 +177,7 @@
       .nice();
     svg.append("g")
       .attr("class", "axis")
-      .call(d3.axisLeft(y));
+      .call(d3.axisLeft(y).ticks(6));
 
     // Reference line at ordinality = 0.5
     svg.append("line")
@@ -171,17 +189,15 @@
 
     svg.append("text")
       .attr("class", "axis-label")
-      .attr("text-anchor", "end")
-      .attr("x", width)
-      .attr("y", height - 6)
+      .attr("text-anchor", "middle")
+      .attr("x", width / 2)
+      .attr("y", height + margin.bottom - 6)
       .text("Year");
 
     svg.append("text")
       .attr("class", "axis-label")
-      .attr("text-anchor", "end")
-      .attr("y", 6)
-      .attr("dy", ".75em")
-      .attr("transform", "rotate(-90)")
+      .attr("text-anchor", "middle")
+      .attr("transform", "translate(" + (-margin.left + 12) + "," + (height / 2) + ") rotate(-90)")
       .text("Ordinality");
 
     // Add the points
@@ -197,20 +213,24 @@
       .append("circle")
         .attr("cx", function(dat) { return x(dat.date) } )
         .attr("cy", function(dat) { return y(dat.ordinality) } )
-        .attr("r", 3)
+        .attr("r", isMobile ? 2.5 : 3)
         .attr("stroke", "white");
 
-    svg.append("g")
-      .attr("class", "legendOrdinal")
-      .attr("transform", "translate(" + String(width + margin.left) + ",20)");
-
-    var legendOrdinal = d3.legendColor()
-      .shapePadding(10)
-      .scale(myColor);
-
-    svg.select(".legendOrdinal")
-      .call(legendOrdinal);
-
+    // Legend rendered as HTML (not inside the SVG) so long binomial labels
+    // wrap instead of being clipped, and so it reflows naturally on mobile.
+    const legend = d3.select("#legend");
+    legend.selectAll("*").remove();
+    const legendItems = legend.selectAll(".legend-item")
+      .data(lst)
+      .enter()
+      .append("div")
+        .attr("class", "legend-item");
+    legendItems.append("span")
+        .attr("class", "legend-swatch")
+        .style("background-color", function(d) { return myColor(d); });
+    legendItems.append("span")
+        .attr("class", "legend-label")
+        .text(function(d) { return d; });
 
     // VORONOI
     const tooltip = d3.select("#tooltip");

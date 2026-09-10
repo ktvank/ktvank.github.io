@@ -104,18 +104,42 @@ body {
 }
 
 .svg-container {
-  display: inline-block;
-  position: relative;
   width: 100%;
-  padding-bottom: 83.3%; /* matches viewBox 1200x1000 */
-  vertical-align: top;
 }
 
 .svg-content {
-  display: inline-block;
-  position: absolute;
-  top: 0;
-  left: 0;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ── Legend ────────────────────────────────────────────── */
+/* Rendered as HTML (not inside the SVG) so long binomial labels wrap
+   instead of being clipped, and reflow naturally at any width. */
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #eee;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #333;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
 /* ── Axis labels ───────────────────────────────────────── */
@@ -171,4 +195,48 @@ body {
 .tooltip-row span {
   font-weight: 600;
   color: #333;
+}
+
+/* ── Mobile ────────────────────────────────────────────── */
+
+@media (max-width: 576px) {
+  .container {
+    padding: 0 1rem;
+  }
+
+  .site-header {
+    padding: 1.5rem 1.25rem 1.25rem;
+  }
+
+  .site-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .site-header p {
+    font-size: 0.9rem;
+  }
+
+  .chart-card {
+    padding: 0.75rem;
+  }
+
+  .input-group {
+    flex-wrap: wrap;
+  }
+
+  .input-section .form-control {
+    border-radius: 4px;
+    width: 100%;
+  }
+
+  .input-section .btn-primary {
+    border-radius: 4px;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  #tooltip {
+    max-width: 220px;
+    font-size: 0.8rem;
+  }
 }
