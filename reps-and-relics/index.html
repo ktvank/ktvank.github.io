@@ -1386,6 +1386,7 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button class="s-btn" onclick="saveCustomizations()">Save notes</button>
         <button class="s-btn" id="regen-btn" onclick="regenerateRegime()" style="background:var(--dusk4);border-color:var(--dusk3);color:var(--dusk2)">Regenerate Regime</button>
+        <button class="s-btn" onclick="restorePreviousRoutine()">Restore previous routine</button>
       </div>
       <div style="font-size:10px;color:var(--ink4);margin-top:10px;line-height:1.6">⚠ AI-generated sessions may contain errors. Treat all exercises as suggestions — not medical advice. Consult a qualified professional before starting a new programme or if you have any health conditions or injuries.</div>
     </div>
@@ -2877,6 +2878,7 @@ let S = {
   tutorialSeen:    false,
   prefs:           null,   // { experience, daysPerWeek, sessionLength, equipment, genre, tone }
   customSessions:  [],     // AI-generated sessions; falls back to SESSIONS if empty
+  prevSessions:    null,   // routine as it was before the last AI replacement (undo)
   loreNotes:       [],     // story canon facts [{text, added}]
   exerciseChecked: {},     // { "sessIdx-exIdx": true } — in-progress workout checks
   arcComplete:     false,  // true when S.sessions crosses an arc boundary
@@ -3034,7 +3036,7 @@ const NARRATIVE_FIELDS = [
   'storyText', 'storyChapters', 'storyChapterIdx', 'storyChapterMaxIdx', 'storyChaptersMaxIdx',
   'storySeeds', 'arcSummary', 'arcComplete', 'storyChapter', 'storyChaptersUnlocked',
   'currentArcTitle', 'currentArcPremise',
-  'customSessions', 'levelLoot', 'earnedTitles',
+  'customSessions', 'prevSessions', 'levelLoot', 'earnedTitles',
   'customLoot', 'customBadges', 'customLevelLoot', 'customReminders',
   'loreNotes', 'companionsSeen', 'companionCandidates', 'generatedCompanions',
   'exerciseChecked', 'charFlags', 'heroPortrait', 'heroPortraitN',
@@ -4084,6 +4086,7 @@ async function generateWeekPlan() {
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
   try {
     const plan = await generateMultiDayPlan(desc, days);
+    snapshotRoutine();
     S.customSessions = plan;
     curSess = 0;
     editingSessMeta = null;
@@ -4838,7 +4841,7 @@ async function completeSession(i) {
     logEntries.push({ key: baselineKey(ex), name: ex.p || ex.f, feel, did });
   });
   if (!S.workoutLog) S.workoutLog = [];
-  S.workoutLog.push({ date: t, narrativeId: S.activeNarrativeId, role: i, entries: logEntries });
+  S.workoutLog.push({ date: t, narrativeId: S.activeNarrativeId, role: i, label: sess.tag || sess.label || '', entries: logEntries });
   if (S.workoutLog.length > 300) S.workoutLog = S.workoutLog.slice(-300);
   S.exerciseFeel = {};
   S.todayTrim = null;   // the per-day time trim is spent
@@ -5824,6 +5827,7 @@ Return ONLY a raw JSON array, no markdown or code fences:
   }).filter(s => s.exercises.length);
 
   if (!sessions.length) throw new Error('No usable exercises were generated — try again.');
+  snapshotRoutine();
   S.customSessions = sessions;
 }
 
@@ -7110,6 +7114,68 @@ function saveCustomizations() {
   toast('Customizations saved.');
 }
 
+// Keep the outgoing routine so an AI replacement can be undone.
+function snapshotRoutine() {
+  if (S.customSessions && S.customSessions.length) S.prevSessions = _clone(S.customSessions);
+}
+
+/* Rebuild the routine that was in use before the current one, from the workout
+   log: for each day (role), the most recent logged sessions whose exercises
+   aren't all in today's routine. Weights/reps come back automatically because
+   baselines are keyed by exercise id. */
+function routineFromWorkoutLog() {
+  const curKeys = new Set();
+  getSessions().forEach(sess => sess.exercises.forEach(ex => curKeys.add(baselineKey(ex))));
+  const log = (S.workoutLog || []).filter(w => w.narrativeId === S.activeNarrativeId && w.entries && w.entries.length);
+  const byRole = new Map();   // role → { label, keys: Map(key → name), seen }
+  for (let k = log.length - 1; k >= 0; k--) {
+    const w = log[k];
+    if (w.entries.every(e => curKeys.has(e.key))) continue;   // logged from the current routine
+    const r = byRole.get(w.role) || { label: w.label || '', keys: new Map(), seen: 0 };
+    if (r.seen >= 3) continue;   // a few recent sessions per day catch exercises left unchecked once
+    r.seen++;
+    if (!r.label && w.label) r.label = w.label;
+    w.entries.forEach(e => { if (!r.keys.has(e.key)) r.keys.set(e.key, e.name); });
+    byRole.set(w.role, r);
+  }
+  const p = S.prefs || {};
+  return [...byRole.keys()].sort((a, b) => a - b).map(role => {
+    const r = byRole.get(role);
+    const exercises = [];
+    for (const [key, name] of r.keys) {
+      if (key.startsWith('name:')) {
+        exercises.push({ f: name, p: name, h: '', sets: '3 × 10', xp: 15 });
+      } else {
+        const [ex] = hydrateChosenExercises([{ id: key }], p);
+        if (ex) exercises.push(ex);
+      }
+    }
+    const label = r.label || `Day ${role + 1}`;
+    return { label, tag: label, sub: 'Restored from your workout history', xp: 15, exercises };
+  }).filter(s => s.exercises.length);
+}
+
+async function restorePreviousRoutine() {
+  let prev = S.prevSessions && S.prevSessions.length ? S.prevSessions : null;
+  let fromLog = false;
+  if (!prev) {
+    try { await loadExerciseDB(); } catch (_) {}
+    prev = routineFromWorkoutLog();
+    fromLog = true;
+  }
+  if (!prev || !prev.length) { toast('No previous routine found to restore.'); return; }
+  const summary = prev.map(s => `• ${s.tag || s.label}: ${s.exercises.map(e => e.p || e.f).join(', ')}`).join('\n');
+  if (!confirm(`Restore this routine?\n\n${summary}\n\n${fromLog ? 'Rebuilt from your workout log — day names may need re-entering.\n' : ''}Your current routine is kept, so you can switch back with the same button.`)) return;
+  const cur = S.customSessions && S.customSessions.length ? _clone(S.customSessions) : null;
+  S.customSessions = _clone(prev);
+  S.prevSessions = cur;
+  S.exerciseChecked = {};
+  curSess = 0;
+  save();
+  renderAll();
+  toast('✦ Previous routine restored.');
+}
+
 async function regenerateRegime() {
   saveCustomizations();
   const btn = document.getElementById('regen-btn');
@@ -7141,12 +7207,10 @@ async function showLevelUpModal(newLv) {
   document.getElementById('lvup-title-text').textContent = getTitle();
   storyEl.innerHTML = `<span class="pulse">${heroName()} pauses to take stock</span>`;
 
-  // Regenerate training routine — run in parallel with the story snippet.
-  // Milestone levels (multiples of 5) get a full overhaul; others get incremental progression.
+  // The routine is left alone — progression happens per exercise (reps → load),
+  // so levelling up never swaps out moves the user knows. Refreshing is opt-in
+  // via Options → Regenerate Regime.
   const isMilestone = newLv % 5 === 0;
-  const sessionsDone = generateSessions(isMilestone ? 'majorlevelup' : 'levelup')
-    .then(() => { save(); renderAll(); })
-    .catch(() => {});
 
   // Generate a new earned title at every milestone level.
   if (isMilestone && getApiKey()) {
@@ -7214,13 +7278,8 @@ Prose style: specific and grounded. Use concrete detail — what can be seen, fe
     storyEl.innerHTML = `<p>${heroName()} takes a moment. Something is different. ${heroName()} doesn't mention it to anyone.</p>`;
   }
 
-  // Wait for new sessions before letting the user continue — avoids surprise re-render
-  await sessionsDone;
   if (onwardBtn) onwardBtn.disabled = false;
   _levelUpInProgress = false;
-  toast(isMilestone
-    ? '✦ Major program overhaul — new training unlocked for Level ' + newLv + '.'
-    : '✦ Training routine updated for Level ' + newLv + '.');
 }
 
 function closeLevelUp() {
