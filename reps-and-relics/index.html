@@ -732,6 +732,9 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
 .lvup-reward-lbl { font-size: 8px; font-family: var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--gold2); margin-bottom: 8px; }
 .lvup-reward-icon { font-size: 30px; margin-bottom: 5px; line-height: 1; }
 .lvup-reward-name { font-size: 13px; color: var(--ink); margin-bottom: 3px; }
+.lvup-swap { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--sage3); border-radius: 8px; text-align: left; font-size: 11px; color: var(--ink2); line-height: 1.5; }
+.lvup-swap-btns { display: flex; gap: 6px; margin-top: 8px; }
+.lvup-swap-btns .s-btn { flex: 1; }
 .lvup-reward-desc { font-size: 10px; color: var(--ink3); font-style: italic; font-family: var(--font-story); }
 
 .lvup-btn {
@@ -1103,6 +1106,7 @@ textarea.s-input { resize: vertical; min-height: 62px; line-height: 1.5; }
     <div class="lvup-title-text" id="lvup-title-text"></div>
     <div class="lvup-story" id="lvup-story"><span class="pulse">A moment of reflection…</span></div>
     <div class="lvup-reward" id="lvup-reward"></div>
+    <div class="lvup-swap hidden" id="lvup-swap"></div>
     <button class="lvup-btn" id="lvup-btn" onclick="closeLevelUp()" disabled>Onward</button>
   </div>
 </div>
@@ -2905,6 +2909,7 @@ let S = {
   progressionLog:  [],     // [{ date, key, name, change, from, to, trigger }]
   exerciseFeel:    {},     // { "si-ei": "easy"|"ok"|"hard" } — in-progress feel taps, cleared on complete
   benched:         {},     // exId → { until: ISO date, count, name } — "something hurts", temporary
+  swapSnooze:      {},     // exercise key → times-logged at which to offer a new move again
   todayTrim:       null,   // { date, sess, minutes } — per-day time budget
   trainingGoal:    'build',// 'build' (keep progressing) | 'maintain' (hold loads)
   trainingFocus:   '',     // free-text emphasis fed into session generation
@@ -4262,6 +4267,112 @@ async function swapExercise(si, ei, opts = {}) {
   renderWorkoutCard();
   if (!opts.silent) toast(`Swapped in ${pick.name} — your progress carried over.`);
   return pick.id;
+}
+
+/* Opt-in variety: once an exercise has been logged SWAP_OFFER_AFTER times (and
+   isn't still a struggle), level-up offers ONE harder move for that slot.
+   The replacement must be a higher difficulty tier, the same movement pattern
+   AND the same main muscle, so a day's muscle spread never shifts (swapping
+   can't turn a balanced day into all quads). Same equipment is preferred.
+   Declining snoozes that exercise for another round. */
+const SWAP_OFFER_AFTER = 10;
+
+function _timesLogged(key) {
+  let n = 0, lastFeel = null;
+  for (const w of (S.workoutLog || [])) for (const e of (w.entries || []))
+    if (e.key === key) { n++; lastFeel = e.feel; }
+  return { n, lastFeel };
+}
+
+// Most-practised eligible exercise that actually has a harder same-muscle option.
+function progressSwapCandidate() {
+  const cands = [];
+  getSessions().forEach((sess, si) => sess.exercises.forEach((ex, ei) => {
+    if (!ex.exId) return;
+    const key = baselineKey(ex);
+    const { n, lastFeel } = _timesLogged(key);
+    if (n < Math.max(SWAP_OFFER_AFTER, (S.swapSnooze || {})[key] || 0) || lastFeel === 'hard') return;
+    cands.push({ si, ei, ex, times: n });
+  }));
+  cands.sort((a, b) => b.times - a.times);
+  for (const c of cands) {
+    const pick = progressSwapPick(c.ex);
+    if (pick) return { ...c, pick };
+  }
+  return null;
+}
+
+function progressSwapPick(ex) {
+  const rec = exById(ex.exId);
+  if (!rec) return null;
+  const pat  = _exPattern(rec);
+  const rank = levelRank(rec.level);
+  const ceil = Math.max(levelRank(expLevelCeil((S.prefs || {}).experience)), Math.min(3, rank + 1));
+  const used = new Set();
+  getSessions().forEach(s => s.exercises.forEach(e => e.exId && used.add(e.exId)));
+  const main = rec.pm[0];
+  const pool = filterExercises({ equipment: (S.prefs || {}).equipment, maxLevel: ['beginner', 'intermediate', 'expert'][ceil - 1] })
+    .filter(e => _exKind(e) === 'strength' && _exPattern(e) === pat && e.pm[0] === main
+              && !used.has(e.id) && levelRank(e.level) > rank);
+  if (!pool.length) return null;
+  const score = e => (e.eq === rec.eq ? 4 : 0) + (levelRank(e.level) === rank + 1 ? 2 : 0)
+                   + (e.mech === rec.mech ? 1 : 0) + Math.random() * 0.5;
+  return pool.sort((a, b) => score(b) - score(a))[0];
+}
+
+let _pendingSwap = null;
+
+async function renderLevelUpSwap() {
+  const el = document.getElementById('lvup-swap');
+  if (!el) return;
+  el.classList.add('hidden');
+  _pendingSwap = null;
+  try { await loadExerciseDB(); } catch (_) { return; }
+  const c = progressSwapCandidate();
+  const pick = c && c.pick;
+  if (!pick) return;
+  _pendingSwap = { si: c.si, ei: c.ei, exId: c.ex.exId, key: baselineKey(c.ex), times: c.times, pick };
+  el.innerHTML = `
+    <div class="lvup-reward-lbl">Ready for something new?</div>
+    You've done <b>${escHtml(c.ex.p)}</b> ${c.times} times. Want to swap in
+    <b>${escHtml(pick.name)}</b>, a step harder for the same muscles${pick.eq !== (exById(c.ex.exId) || {}).eq ? ` (uses ${escHtml(pick.eq)})` : ''}?
+    <div class="lvup-swap-btns">
+      <button class="s-btn" onclick="acceptProgressSwap()">Try it</button>
+      <button class="s-btn" onclick="declineProgressSwap()">Keep ${escHtml(c.ex.p)}</button>
+    </div>`;
+  el.classList.remove('hidden');
+}
+
+async function acceptProgressSwap() {
+  const sw = _pendingSwap;
+  _pendingSwap = null;
+  document.getElementById('lvup-swap').classList.add('hidden');
+  if (!sw) return;
+  ensureCustomSessions();
+  const ex = S.customSessions[sw.si] && S.customSessions[sw.si].exercises[sw.ei];
+  if (!ex || ex.exId !== sw.exId) return;
+  snapshotRoutine();   // "Restore previous routine" undoes it
+  const pick = sw.pick;
+  ex.f = getApiKey() ? (await generateExerciseName(pick.name).catch(() => pick.name)) || pick.name : pick.name;
+  ex.p = pick.name;
+  ex.exId = pick.id;
+  ex.h = (pick.ins || []).slice(0, 2).join(' ');
+  ex.muscles = (pick.pm || []).slice();
+  // No baseline carry: a new move starts fresh; the old one's weights stay saved
+  // in case it comes back.
+  save();
+  renderAll();
+  toast(`Swapped in ${pick.name}. Changed your mind? Options → Restore previous routine.`);
+}
+
+function declineProgressSwap() {
+  const sw = _pendingSwap;
+  _pendingSwap = null;
+  document.getElementById('lvup-swap').classList.add('hidden');
+  if (!sw) return;
+  if (!S.swapSnooze) S.swapSnooze = {};
+  S.swapSnooze[sw.key] = sw.times + SWAP_OFFER_AFTER;
+  save();
 }
 
 // "Something hurts" — swap the movement out, rest it for ~18 days (longer if it
@@ -7240,6 +7351,7 @@ async function showLevelUpModal(newLv) {
   const onwardBtn = document.getElementById('lvup-btn');
   if (onwardBtn) onwardBtn.disabled = true;
   modal.classList.remove('hidden');
+  renderLevelUpSwap();
 
   // Generate celebratory story snippet (no plot advancement)
   const adv   = getAdv();
